@@ -16,11 +16,12 @@ struct FocusView: View {
                 SpriteView(rows: Sprite.target, px: 2)
                 Text("Focus").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.pink)
                 Spacer()
+                modeToggle
                 if snapshot { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) } else { menu }
             }
             HStack(alignment: .center, spacing: 18) {
                 TimerDial(minutes: model.settings.focusMinutes, progress: dialProgress, clock: clock,
-                          caption: dialCaption) { model.setFocusMinutes($0) }
+                          caption: dialCaption, onCommit: { model.setFocusMinutes($0) }, editable: !stopwatch)
                 VStack(alignment: .leading, spacing: 10) {
                     Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textPrimary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -28,7 +29,7 @@ struct FocusView: View {
                         playButton
                         if model.phase != .idle {
                             Button {
-                                if model.phase == .resting { model.stop(reason: nil) }
+                                if model.phase == .resting || model.isStopwatch { model.stop(reason: nil) }
                                 else { withAnimation(.easeOut(duration: 0.15)) { askingReason = true } }
                             } label: {
                                 Image(systemName: "stop.fill").font(.system(size: 12)).foregroundStyle(theme.textSecondary)
@@ -53,20 +54,52 @@ struct FocusView: View {
         .overlay { cards }
     }
 
+    /// Stopwatch look: idle in stopwatch mode, or a running stopwatch session.
+    private var stopwatch: Bool { model.phase == .idle ? model.settings.stopwatchMode : model.isStopwatch }
+
     private var clock: String {
+        if stopwatch {
+            let s = model.phase == .idle ? 0 : model.elapsedS
+            return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%02d:%02d", s / 60, s % 60)
+        }
         let s = model.phase == .idle ? model.plannedS : model.remainingS
         return String(format: "%02d:%02d", s / 60, s % 60)
     }
 
-    /// Ring fill while something runs: the share of time left. Nil while idle (the dial is editable).
+    /// Ring fill while something runs: time left for a countdown, the current hour for a stopwatch.
+    /// Nil while idle in timer mode (the dial is editable).
     private var dialProgress: Double? {
+        if stopwatch { return model.phase == .idle ? 0 : Double(model.elapsedS % 3600) / 3600 }
         guard model.phase != .idle, model.plannedS > 0 else { return nil }
         return Double(model.remainingS) / Double(model.plannedS)
     }
 
+    /// Two small pills; hidden while a session runs so the mode can't change mid-session.
+    @ViewBuilder private var modeToggle: some View {
+        if model.phase == .idle {
+            HStack(spacing: 2) {
+                ForEach([false, true], id: \.self) { sw in
+                    let on = model.settings.stopwatchMode == sw
+                    Button { model.settings.stopwatchMode = sw; model.objectWillChange.send() } label: {
+                        Image(systemName: sw ? "stopwatch" : "timer")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(on ? theme.onPink : theme.textSecondary)
+                            .frame(width: 26, height: 20)
+                            .background(Capsule().fill(on ? theme.pink : .clear))
+                    }
+                    .buttonStyle(.plain)
+                    .help(sw ? "Stopwatch: count up, stop when you're done" : "Timer: count down from the dial")
+                }
+            }
+            .padding(2)
+            .background(Capsule().fill(theme.elevated))
+        }
+    }
+
     private var dialCaption: String {
         switch model.phase {
-        case .idle: return "min"
+        case .idle: return stopwatch ? "stopwatch" : "min"
+        case .running where stopwatch: return "elapsed"
         case .running: return "left"
         case .paused: return "paused"
         case .resting: return "rest"

@@ -23,6 +23,8 @@ final class AppSettings: ObservableObject {
     @Published var showToday: Bool { didSet { d.set(showToday, forKey: "showToday") } }
     @Published var showFocus: Bool { didSet { d.set(showFocus, forKey: "showFocus") } }
     @Published var showProgress: Bool { didSet { d.set(showProgress, forKey: "showProgress") } }
+    /// Stopwatch (count up, no end) instead of a countdown.
+    @Published var stopwatchMode: Bool { didSet { d.set(stopwatchMode, forKey: "stopwatchMode") } }
     /// Custom stop-early reasons the user chose to keep (already shortened).
     @Published var savedReasons: [String] { didSet { d.set(savedReasons, forKey: "savedReasons") } }
 
@@ -54,6 +56,7 @@ final class AppSettings: ObservableObject {
         showFocus = d.bool(forKey: "showFocus")
         showProgress = d.bool(forKey: "showProgress")
         savedReasons = d.stringArray(forKey: "savedReasons") ?? []
+        stopwatchMode = d.bool(forKey: "stopwatchMode")
     }
 
     var preset: FocusPreset { .forFocus(focusMinutes) }

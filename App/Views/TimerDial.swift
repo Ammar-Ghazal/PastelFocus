@@ -16,13 +16,15 @@ struct TimerDial: View {
     let caption: String
     let onCommit: (Int) -> Void
     var size: CGFloat = 112
+    /// False in stopwatch mode: there's no length to set.
+    var editable = true
 
     @State private var dragMinutes: Int?
     @FocusState private var focused: Bool
 
-    private var interactive: Bool { progress == nil }
+    private var interactive: Bool { editable && progress == nil }
     private var shown: Int { dragMinutes ?? minutes }
-    private var fill: Double { progress ?? DialMath.fraction(shown) }
+    private var fill: Double { progress ?? (editable ? DialMath.fraction(shown) : 0) }
     private let line: CGFloat = 7
 
     var body: some View {

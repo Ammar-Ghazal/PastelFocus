@@ -116,7 +116,8 @@ public struct AnalyticsEngine {
         let spans = s.compactMap(\.secondsToFirstInterruption).map { Double($0) / 60 }
         guard spans.count >= thresholds.minFocusSpanSessions else { return [] }
         let m = median(spans), q1 = quantile(spans, 0.25), q3 = quantile(spans, 0.75)
-        let planned = median(s.map { Double($0.plannedS) / 60 })
+        // Stopwatch sessions have no plan to compare against.
+        let planned = median(s.filter { !$0.isStopwatch }.map { Double($0.plannedS) / 60 })
         var title = "Focus usually breaks after about \(Int(m.rounded())) min"
         if planned > 0, (planned - m) / planned >= thresholds.shorterSessionGap {
             title += "; try \(max(15, Int((m / 5).rounded(.down)) * 5))-min sessions"

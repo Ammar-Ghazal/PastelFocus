@@ -26,6 +26,10 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public var nextTask: Row?
     public var focusedMinutesToday: Int
     public var goodDays: Int
+    /// Stopwatch only: when counting started (adjusted for pauses), so the widget can count up itself.
+    public var timerStart: Date? = nil
+    /// Stopwatch only: seconds so far (shown while paused).
+    public var elapsedS: Int? = nil
 
     public init(updated: Date, tasks: [Row], doneCount: Int, totalCount: Int, phase: FocusPhase, timerTitle: String,
                 timerEnd: Date?, remainingS: Int, nextTask: Row?, focusedMinutesToday: Int, goodDays: Int) {

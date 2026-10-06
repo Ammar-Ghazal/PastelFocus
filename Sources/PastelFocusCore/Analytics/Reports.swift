@@ -65,10 +65,14 @@ public enum Reports {
         public var remainingS: Int
         public var plannedS: Int
         public var pauses: Int
+        public var stopwatch: Bool
+        public var elapsedS: Int
         public init(appRunning: Bool, phase: FocusPhase, taskTitle: String? = nil, taskID: String? = nil,
-                    kind: SessionKind? = nil, remainingS: Int = 0, plannedS: Int = 0, pauses: Int = 0) {
+                    kind: SessionKind? = nil, remainingS: Int = 0, plannedS: Int = 0, pauses: Int = 0,
+                    stopwatch: Bool = false, elapsedS: Int = 0) {
             self.appRunning = appRunning; self.phase = phase; self.taskTitle = taskTitle; self.taskID = taskID
             self.kind = kind; self.remainingS = remainingS; self.plannedS = plannedS; self.pauses = pauses
+            self.stopwatch = stopwatch; self.elapsedS = elapsedS
         }
     }
 
@@ -81,7 +85,9 @@ public enum Reports {
             case .idle: lines += ["**Timer:** idle", ""]
             case .running, .paused:
                 let what = state.taskTitle.map { "\"\($0)\" (🆔 \(state.taskID ?? "none"))" } ?? "Unassigned"
-                lines += ["**Timer:** \(state.phase == .paused ? "paused" : "focusing") on \(what) — \(minutes(state.remainingS)) left of \(minutes(state.plannedS)), pauses \(state.pauses)", ""]
+                let progress = state.stopwatch ? "stopwatch, \(minutes(state.elapsedS)) so far"
+                                               : "\(minutes(state.remainingS)) left of \(minutes(state.plannedS))"
+                lines += ["**Timer:** \(state.phase == .paused ? "paused" : "focusing") on \(what) — \(progress), pauses \(state.pauses)", ""]
             case .resting:
                 let kind = state.kind == .nsdr ? "NSDR" : state.kind == .longBreak ? "long rest" : "short rest"
                 lines += ["**Timer:** \(kind), \(minutes(state.remainingS)) left", ""]

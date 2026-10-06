@@ -85,9 +85,9 @@ public final class Coordinator {
     // MARK: Timer
 
     /// Starts focus on a task; returns a suggestion to show first, if any (shorter sessions).
-    public func startFocus(task: TaskItem?, minutes: Int? = nil) throws {
+    public func startFocus(task: TaskItem?, minutes: Int? = nil, stopwatch: Bool = false) throws {
         let ref = task.flatMap { t in t.taskID.map { TaskRef(id: $0, title: t.title, category: t.category) } }
-        try engine.start(task: ref, minutes: minutes)
+        try engine.start(task: ref, minutes: minutes, stopwatch: stopwatch)
         if let id = ref?.id, let t = store.find(id), t.status == .todo { try? perform { try $0.setStatus(id, .inProgress, actor: .app) } }
         saveEngine()
         writeNow()
@@ -140,7 +140,8 @@ public final class Coordinator {
     public func nowState(appRunning: Bool = true) -> Reports.NowState {
         Reports.NowState(appRunning: appRunning, phase: engine.phase, taskTitle: engine.active?.task?.title,
                          taskID: engine.active?.task?.id, kind: engine.active?.kind, remainingS: engine.remainingS,
-                         plannedS: engine.active?.plannedS ?? engine.preset.focusMinutes * 60, pauses: engine.active?.pauses.count ?? 0)
+                         plannedS: engine.active?.plannedS ?? engine.preset.focusMinutes * 60, pauses: engine.active?.pauses.count ?? 0,
+                         stopwatch: engine.isStopwatch, elapsedS: engine.elapsedS)
     }
 
     public func writeNow(appRunning: Bool = true) {
@@ -161,10 +162,12 @@ public final class Coordinator {
                                       done: t.status == .done, high: t.priority == .high)
         }
         let next = rows.first { !$0.done && $0.high } ?? rows.first { !$0.done }
-        let snap = WidgetSnapshot(updated: clock.now(), tasks: rows, doneCount: rows.filter(\.done).count, totalCount: rows.count,
+        var snap = WidgetSnapshot(updated: clock.now(), tasks: rows, doneCount: rows.filter(\.done).count, totalCount: rows.count,
                                   phase: engine.phase, timerTitle: engine.active?.task?.title ?? (engine.phase == .resting ? "Rest" : "Pick a task"),
-                                  timerEnd: engine.endDate, remainingS: engine.remainingS, nextTask: next,
+                                  timerEnd: engine.countdownEnd, remainingS: engine.remainingS, nextTask: next,
                                   focusedMinutesToday: focusedToday / 60, goodDays: garden().goodDays)
+        snap.timerStart = engine.stopwatchStart
+        snap.elapsedS = engine.isStopwatch ? engine.elapsedS : nil
         var unchanged = WidgetBridge.read(from: dir)
         unchanged.updated = snap.updated
         if unchanged == snap { return }
