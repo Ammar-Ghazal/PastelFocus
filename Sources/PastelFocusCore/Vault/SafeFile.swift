@@ -75,6 +75,22 @@ public enum SafeFile {
         }
     }
 
+    /// Writes `text` only if it differs from the file, ignoring lines that contain `ignoring`
+    /// (e.g. an "Updated …" timestamp). Avoids waking file watchers for no-op writes.
+    /// Returns true if the file was written.
+    @discardableResult
+    public static func writeIfChanged(_ text: String, to url: URL, ignoring marker: String? = nil) throws -> Bool {
+        let old = try? String(contentsOf: url, encoding: .utf8)
+        func strip(_ s: String) -> String {
+            guard let marker else { return s }
+            return s.split(separator: "\n", omittingEmptySubsequences: false).filter { !$0.contains(marker) }.joined(separator: "\n")
+        }
+        if let old, strip(old) == strip(text) { return false }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        return true
+    }
+
     struct Signature: Equatable { let size: Int; let mtime: Date? ; let exists: Bool }
 
     static func signature(_ url: URL) -> Signature {

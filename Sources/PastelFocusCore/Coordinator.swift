@@ -148,8 +148,8 @@ public final class Coordinator {
         let rollup = Rollups.build(sessions: sessions.filter { calendar.day($0.startedAt) == today },
                                    events: store.events.readAll().filter { calendar.day($0.at) == today }, calendar: calendar)[today]
         let text = Reports.now(nowState(appRunning: appRunning), today: todayTasks, rollup: rollup, updated: clock.now(), calendar: calendar)
-        try? FileManager.default.createDirectory(at: config.appDir, withIntermediateDirectories: true)
-        try? text.write(to: config.now, atomically: true, encoding: .utf8)
+        // The app watches this folder, so skip writes that would only change the timestamp.
+        _ = try? SafeFile.writeIfChanged(text, to: config.now, ignoring: "_Written by PastelFocus. Updated")
         writeWidgetSnapshot(focusedToday: rollup?.focusedS ?? 0)
     }
 
@@ -165,6 +165,9 @@ public final class Coordinator {
                                   phase: engine.phase, timerTitle: engine.active?.task?.title ?? (engine.phase == .resting ? "Rest" : "Pick a task"),
                                   timerEnd: engine.endDate, remainingS: engine.remainingS, nextTask: next,
                                   focusedMinutesToday: focusedToday / 60, goodDays: garden().goodDays)
+        var unchanged = WidgetBridge.read(from: dir)
+        unchanged.updated = snap.updated
+        if unchanged == snap { return }
         try? WidgetBridge.write(snap, to: dir)
     }
 

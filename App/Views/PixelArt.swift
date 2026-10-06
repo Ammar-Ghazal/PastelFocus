@@ -97,18 +97,38 @@ struct IslandView: View {
     var cell: CGFloat = 26
     var animate = true
 
+    /// Only fireflies and the waterfall move; without them nothing is redrawn.
+    private var moving: Bool { animate && ((island?.fireflies ?? 0) > 0 || landmarks.contains(.waterfall)) }
+    @Environment(\.snapshotMode) private var snapshot
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: animate ? 0.125 : 3600)) { tl in
-            Canvas { ctx, size in
-                var c = ctx
-                draw(&c, size: size, t: tl.date.timeIntervalSinceReferenceDate)
+        // The island is drawn once; only the small overlay animates (keeps CPU low).
+        Canvas { ctx, size in
+            var c = ctx
+            drawStatic(&c, size: size)
+        }
+        .overlay {
+            if moving && !snapshot && !reduceMotion {
+                // Core Animation runs in the render server, so the app itself stays near 0% CPU.
+                AmbientLayer(fireflies: min(island?.fireflies ?? 0, 40), waterfall: landmarks.contains(.waterfall),
+                             cell: cell, columns: Garden.columns, rows: Garden.rows)
+            } else {
+                Canvas { ctx, size in
+                    var c = ctx
+                    drawMoving(&c, size: size, t: 0)
+                }
             }
         }
         .frame(width: cell * CGFloat(Garden.columns) + 24, height: cell * CGFloat(Garden.rows) + 34)
     }
 
-    private func draw(_ ctx: inout GraphicsContext, size: CGSize, t: Double) {
-        let w = cell * CGFloat(Garden.columns), h = cell * CGFloat(Garden.rows)
+    private var geometry: (w: CGFloat, h: CGFloat, px: CGFloat) {
+        (cell * CGFloat(Garden.columns), cell * CGFloat(Garden.rows), max(2, (cell / 8).rounded(.down)))
+    }
+
+    private func drawStatic(_ ctx: inout GraphicsContext, size: CGSize) {
+        let (w, h, px) = geometry
         let ox = (size.width - w) / 2, oy: CGFloat = 16
         // Island ground: layered rounded blobs.
         let ground = Path(roundedRect: CGRect(x: ox - 8, y: oy + 6, width: w + 16, height: h + 4), cornerRadius: 22)
@@ -116,7 +136,6 @@ struct IslandView: View {
         ctx.fill(Path(roundedRect: CGRect(x: ox - 4, y: oy + 2, width: w + 8, height: h), cornerRadius: 20), with: .color(Color(hex: 0x3E6658)))
         ctx.fill(Path(roundedRect: CGRect(x: ox - 8, y: oy + h + 2, width: w + 16, height: 10), cornerRadius: 5), with: .color(Color(hex: 0x1E2A3A)))
 
-        let px = max(2, (cell / 8).rounded(.down))
         func centre(_ x: Int, _ y: Int) -> CGPoint { CGPoint(x: ox + (CGFloat(x) + 0.5) * cell, y: oy + (CGFloat(y) + 1) * cell) }
 
         for lm in landmarks {
@@ -131,10 +150,7 @@ struct IslandView: View {
             case .smallHouse: Sprite.draw(Sprite.house, in: &ctx, anchor: CGPoint(x: centre(2, 0).x + cell / 2, y: centre(2, 0).y), px: px)
             case .waterfall:
                 let top = centre(11, 0)
-                for i in 0..<4 {
-                    let yy = top.y - cell + CGFloat((Int(t * 8) + i * 3) % 12) * cell / 6
-                    ctx.fill(Path(CGRect(x: top.x - px, y: yy, width: px * 2, height: px * 3)), with: .color(Color(hex: 0x8DE4E6, opacity: 0.8)))
-                }
+                ctx.fill(Path(CGRect(x: top.x - px * 2, y: top.y - cell, width: px * 4, height: cell * 2)), with: .color(Color(hex: 0x5FB3C4, opacity: 0.6)))
             }
         }
 
@@ -149,6 +165,18 @@ struct IslandView: View {
                         tint: item.variant == .golden ? Color(hex: 0xF8DFA1) : nil, glow: item.variant != .normal)
         }
 
+    }
+
+    private func drawMoving(_ ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let (w, h, px) = geometry
+        let ox = (size.width - w) / 2, oy: CGFloat = 16
+        if landmarks.contains(.waterfall) {
+            let top = CGPoint(x: ox + 11.5 * cell, y: oy + cell)
+            for i in 0..<4 {
+                let yy = top.y - cell + CGFloat((Int(t * 8) + i * 3) % 12) * cell / 6
+                ctx.fill(Path(CGRect(x: top.x - px, y: yy, width: px * 2, height: px * 3)), with: .color(Color(hex: 0x8DE4E6, opacity: 0.8)))
+            }
+        }
         // Fireflies: one per task finished this week.
         let flies = island?.fireflies ?? 0
         for i in 0..<min(flies, 40) {
@@ -184,5 +212,70 @@ struct PostcardView: View {
         }
         .padding(24)
         .background(Color(hex: 0x111827))
+    }
+}
+
+
+/// Fireflies and waterfall drops as CALayers with repeating animations (no per-frame app work).
+struct AmbientLayer: NSViewRepresentable {
+    let fireflies: Int
+    let waterfall: Bool
+    let cell: CGFloat
+    let columns: Int
+    let rows: Int
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        v.wantsLayer = true
+        return v
+    }
+
+    func updateNSView(_ v: NSView, context: Context) {
+        DispatchQueue.main.async { build(in: v) }
+    }
+
+    private func build(in v: NSView) {
+        guard let root = v.layer else { return }
+        root.sublayers?.forEach { $0.removeFromSuperlayer() }
+        let w = cell * CGFloat(columns), h = cell * CGFloat(rows)
+        let ox = (v.bounds.width - w) / 2
+        // NSView layers are flipped relative to the Canvas: y grows upwards.
+        let top = v.bounds.height - 16
+        for i in 0..<fireflies {
+            var rng = SeededRandom(seed: UInt64(i + 1) &* 7919)
+            let x = ox + CGFloat.random(in: 0...1, using: &rng) * w
+            let y = top - CGFloat.random(in: 0...1, using: &rng) * h * 0.8
+            let fly = CALayer()
+            fly.frame = CGRect(x: x, y: y, width: 2, height: 2)
+            fly.backgroundColor = NSColor(red: 0.973, green: 0.875, blue: 0.631, alpha: 1).cgColor
+            let blink = CABasicAnimation(keyPath: "opacity")
+            blink.fromValue = 0.1; blink.toValue = 0.9
+            blink.duration = Double.random(in: 1.4...2.8, using: &rng)
+            blink.autoreverses = true; blink.repeatCount = .infinity
+            let drift = CABasicAnimation(keyPath: "position")
+            drift.byValue = NSValue(point: CGPoint(x: CGFloat.random(in: -6...6, using: &rng), y: CGFloat.random(in: -4...4, using: &rng)))
+            drift.duration = Double.random(in: 3...5, using: &rng)
+            drift.autoreverses = true; drift.repeatCount = .infinity
+            fly.add(blink, forKey: "blink")
+            fly.add(drift, forKey: "drift")
+            root.addSublayer(fly)
+        }
+        if waterfall {
+            let px = max(2, (cell / 8).rounded(.down))
+            let x = ox + 11.5 * cell
+            for i in 0..<4 {
+                let drop = CALayer()
+                drop.frame = CGRect(x: x - px, y: top, width: px * 2, height: px * 3)
+                drop.backgroundColor = NSColor(red: 0.553, green: 0.894, blue: 0.902, alpha: 0.8).cgColor
+                let fall = CABasicAnimation(keyPath: "position.y")
+                fall.fromValue = top
+                fall.toValue = top - cell * 2
+                fall.duration = 1.5
+                fall.timeOffset = Double(i) * 0.375
+                fall.repeatCount = .infinity
+                drop.add(fall, forKey: "fall")
+                root.addSublayer(drop)
+            }
+        }
     }
 }

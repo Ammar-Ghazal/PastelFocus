@@ -28,6 +28,19 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertEqual(WidgetBridge.read(from: widgets).totalCount, 2)
     }
 
+    /// Regression: rewriting unchanged files woke the app's own file watcher in a loop (~20% CPU).
+    func testRefreshDoesNotRewriteUnchangedFiles() throws {
+        c.refresh()
+        let mtime = { (try? FileManager.default.attributesOfItem(atPath: self.config.now.path)[.modificationDate]) as? Date }
+        let snapshotTime = { (try? FileManager.default.attributesOfItem(atPath: WidgetBridge.snapshotURL(in: self.widgets).path)[.modificationDate]) as? Date }
+        let before = mtime(), snapBefore = snapshotTime()
+        Thread.sleep(forTimeInterval: 1.1)
+        clock.advance(120) // even the "Updated" minute changes
+        c.refresh()
+        XCTAssertEqual(mtime(), before)
+        XCTAssertEqual(snapshotTime(), snapBefore)
+    }
+
     func testOutsideEditIsLoggedOnceAndAppEditsAreNotDoubled() throws {
         c.refresh()
         // You tick a task in Obsidian.

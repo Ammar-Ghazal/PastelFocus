@@ -292,9 +292,8 @@ public final class TaskStore {
             if fm.fileExists(atPath: config.problems.path) { try fm.removeItem(at: config.problems) }
             return
         }
-        try fm.createDirectory(at: config.appDir, withIntermediateDirectories: true)
         let text = (["# Problems", "", "PastelFocus couldn't fully read these lines. Fix them in place; nothing was deleted.", ""] + problems).joined(separator: "\n") + "\n"
-        try text.write(to: config.problems, atomically: true, encoding: .utf8)
+        try SafeFile.writeIfChanged(text, to: config.problems)
     }
 }
 
