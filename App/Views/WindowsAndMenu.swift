@@ -107,7 +107,7 @@ struct MenuBarContent: View {
 
     var body: some View {
         switch model.phase {
-        case .idle: Button("Start focus  ⌥⌘F") { model.startFocus() }
+        case .idle: Button(model.settings.stopwatchMode ? "Start stopwatch  ⌥⌘F" : "Start focus  ⌥⌘F") { model.startFocus() }
         case .running: Button("Pause  ⌥⌘F") { model.pause() }; Button("Stop") { model.stop(reason: nil) }
         case .paused: Button("Resume  ⌥⌘F") { model.resume() }; Button("Stop") { model.stop(reason: nil) }
         case .resting: Button("Skip rest") { model.stop(reason: nil) }
@@ -132,10 +132,10 @@ struct MenuBarLabel: View {
         switch model.phase {
         case .idle: Image(systemName: "leaf")
         case .running, .paused, .resting:
-            let s = model.remainingS
+            let s = model.isStopwatch ? model.elapsedS : model.remainingS
             HStack(spacing: 3) {
                 Image(systemName: model.phase == .resting ? "cup.and.saucer" : "leaf.fill")
-                Text(String(format: "%02d:%02d", s / 60, s % 60)).monospacedDigit()
+                Text(s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%02d:%02d", s / 60, s % 60)).monospacedDigit()
             }
             .opacity(model.phase == .paused ? 0.5 : 1)
         }

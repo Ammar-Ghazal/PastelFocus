@@ -25,6 +25,8 @@ final class AppModel: ObservableObject {
     @Published var phase: FocusPhase = .idle
     @Published var remainingS = 25 * 60
     @Published var plannedS = 25 * 60
+    @Published var elapsedS = 0
+    @Published var isStopwatch = false
     @Published var activeTitle: String?
     @Published var activeKind: SessionKind?
     @Published var selectedTaskID: String?
@@ -113,6 +115,8 @@ final class AppModel: ObservableObject {
         remainingS = c.engine.remainingS
         plannedS = c.engine.active?.plannedS ?? c.engine.preset.focusMinutes * 60
         activeTitle = c.engine.active?.task?.title
+        elapsedS = c.engine.elapsedS
+        isStopwatch = c.engine.isStopwatch
         activeKind = c.engine.active?.kind
         cycleIndex = c.engine.cycleIndex
         insights = c.insights
@@ -225,12 +229,12 @@ final class AppModel: ObservableObject {
         let t = task ?? selectedTask
         selectedTaskID = t?.taskID ?? selectedTaskID
         let mins = minutes ?? coordinator.engine.preset.focusMinutes
-        if !skipSuggestion, let s = coordinator.suggestionBeforeStart(minutes: mins) {
+        if !skipSuggestion, !settings.stopwatchMode, let s = coordinator.suggestionBeforeStart(minutes: mins) {
             present(s)
             return
         }
         do {
-            try coordinator.startFocus(task: t, minutes: mins)
+            try coordinator.startFocus(task: t, minutes: mins, stopwatch: settings.stopwatchMode && minutes == nil)
             scheduleEndNotification()
         } catch { toast = UndoToast(text: "A session is already running", undo: {}) }
         publish()
@@ -287,6 +291,7 @@ final class AppModel: ObservableObject {
         guard coordinator.engine.phase != .idle else { return }
         if let r = coordinator.tick() { ended(r) }
         remainingS = coordinator.engine.remainingS
+        elapsedS = coordinator.engine.elapsedS
         phase = coordinator.engine.phase
     }
 
@@ -297,7 +302,7 @@ final class AppModel: ObservableObject {
     }
 
     private func scheduleEndNotification() {
-        guard let end = coordinator.engine.endDate, let a = coordinator.engine.active else { return }
+        guard let end = coordinator.engine.countdownEnd, let a = coordinator.engine.active else { return }
         let isFocus = a.kind == .focus
         notifier.schedule(id: "session-end", title: isFocus ? "Focus complete ✦" : "Rest is over",
                           body: isFocus ? (a.task?.title ?? "Unassigned focus") : "Ready for the next block?",

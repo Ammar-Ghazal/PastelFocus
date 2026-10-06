@@ -49,6 +49,10 @@ public struct ActiveSession: Codable, Sendable, Equatable {
     /// Set while paused.
     public var pausedAt: Date?
     public var pauses: [PauseRecord]
+    /// Counts up with no end time (nil in state saved by older versions).
+    public var stopwatch: Bool? = nil
+
+    public var isStopwatch: Bool { stopwatch == true }
 }
 
 public struct FocusSnapshot: Codable, Sendable, Equatable {
@@ -73,6 +77,8 @@ public final class FocusEngine {
     public var maxPauseS = 15 * 60
     /// Sleep longer than this during a running session ends it as "sleep interrupted".
     public var sleepThresholdS = 120
+    /// A stopwatch that runs this long is finished automatically (forgotten timers shouldn't log 20 h of focus).
+    public var stopwatchCapS = 4 * 3600
 
     public init(clock: Clock, preset: FocusPreset = .classic, tzName: String = TimeZone.current.identifier) {
         self.clock = clock
@@ -90,7 +96,21 @@ public final class FocusEngine {
 
     public var remainingS: Int { max(0, (active?.plannedS ?? preset.focusMinutes * 60) - focusedS) }
 
-    /// When the running session will hit 00:00 (for notifications and widget countdowns).
+    /// Seconds counted so far (what a stopwatch shows).
+    public var elapsedS: Int { focusedS }
+
+    public var isStopwatch: Bool { active?.isStopwatch ?? false }
+
+    /// When a countdown hits 00:00, for notifications and widgets. Nil for a stopwatch.
+    public var countdownEnd: Date? { isStopwatch ? nil : endDate }
+
+    /// When a running stopwatch started counting, adjusted for pauses (lets widgets count up by themselves).
+    public var stopwatchStart: Date? {
+        guard isStopwatch, let a = active, let since = a.runningSince else { return nil }
+        return since.addingTimeInterval(-TimeInterval(a.bankedS))
+    }
+
+    /// When the running session ends on its own (for a stopwatch: the safety cap).
     public var endDate: Date? {
         guard let a = active, let since = a.runningSince else { return nil }
         return since.addingTimeInterval(TimeInterval(a.plannedS - a.bankedS))
@@ -106,12 +126,14 @@ public final class FocusEngine {
 
     // MARK: Commands
 
-    public func start(task: TaskRef?, minutes: Int? = nil) throws {
+    /// Starts a countdown of `minutes` (default: the preset), or a stopwatch that counts up.
+    public func start(task: TaskRef?, minutes: Int? = nil, stopwatch: Bool = false) throws {
         guard phase == .idle else { throw EngineError.busy }
-        let planned = (minutes ?? preset.focusMinutes) * 60
+        let planned = stopwatch ? stopwatchCapS : (minutes ?? preset.focusMinutes) * 60
         let now = clock.now()
         active = ActiveSession(id: Self.newSessionID(), kind: .focus, task: task, plannedS: planned,
-                               startedAt: now, bankedS: 0, runningSince: now, pausedAt: nil, pauses: [])
+                               startedAt: now, bankedS: 0, runningSince: now, pausedAt: nil, pauses: [],
+                               stopwatch: stopwatch ? true : nil)
         if cycleIndex % 2 == 1 { cycleIndex = (cycleIndex + 1) % 4 }
         phase = .running
     }
@@ -136,10 +158,12 @@ public final class FocusEngine {
         phase = .running
     }
 
-    /// Stops early. Focus sessions end as "stopped early"; rests end as "skipped".
+    /// Stops. Countdowns end as "stopped early", rests as "skipped"; a stopwatch has no target,
+    /// so stopping it is how it finishes ("completed").
     public func stop(reason: String? = nil) throws -> SessionRecord {
-        guard phase != .idle, active != nil else { throw EngineError.notRunning }
-        let outcome: SessionOutcome = active!.kind == .focus ? .stoppedEarly : .skipped
+        guard phase != .idle, let a = active else { throw EngineError.notRunning }
+        if a.isStopwatch { return finish(at: clock.now(), outcome: .completed, reason: nil) }
+        let outcome: SessionOutcome = a.kind == .focus ? .stoppedEarly : .skipped
         return finish(at: clock.now(), outcome: outcome, reason: reason)
     }
 
@@ -195,9 +219,11 @@ public final class FocusEngine {
         if let pausedAt = a.pausedAt {
             a.pauses.append(PauseRecord(atS: a.bankedS, durS: Int(end.timeIntervalSince(pausedAt))))
         }
-        let focused = outcome == .completed ? a.plannedS : a.bankedS
+        let focused = outcome == .completed && !a.isStopwatch ? a.plannedS : a.bankedS
+        // A stopwatch has no plan: record planned = actual so analytics never read it as cut short.
         let record = SessionRecord(id: a.id, kind: a.kind, taskId: a.task?.id, taskTitle: a.task?.title,
-                                   category: a.task?.category, preset: preset.name, plannedS: a.plannedS,
+                                   category: a.task?.category, preset: a.isStopwatch ? "stopwatch" : preset.name,
+                                   plannedS: a.isStopwatch ? focused : a.plannedS,
                                    startedAt: a.startedAt, endedAt: end, tz: tzName, focusedS: focused,
                                    outcome: outcome, stopReason: reason, pauses: a.pauses)
         if a.kind == .focus, outcome == .completed { cycleIndex = (cycleIndex + 1) % 4 }

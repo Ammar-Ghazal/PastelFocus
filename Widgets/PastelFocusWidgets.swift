@@ -121,7 +121,13 @@ struct FocusWidgetView: View {
             Text("◎ Focus").font(.system(size: 15, weight: .semibold)).foregroundStyle(pink)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    if let end = s.timerEnd, s.phase == .running || s.phase == .resting, end > entry.date {
+                    if let start = s.timerStart, s.phase == .running {
+                        Text(start, style: .timer) // counts up by itself
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                    } else if let elapsed = s.elapsedS {
+                        Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                    } else if let end = s.timerEnd, s.phase == .running || s.phase == .resting, end > entry.date {
                         Text(timerInterval: entry.date...end, countsDown: true)
                             .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
                     } else {

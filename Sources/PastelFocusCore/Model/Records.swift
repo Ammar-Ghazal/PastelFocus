@@ -55,6 +55,8 @@ public struct SessionRecord: Codable, Sendable, Equatable, Identifiable {
         self.outcome = outcome; self.stopReason = stopReason; self.pauses = pauses; self.rating = rating
     }
 
+    public var isStopwatch: Bool { preset == "stopwatch" }
+
     /// Seconds of focus before the first pause or stop; nil when the session ran clean to the end.
     public var secondsToFirstInterruption: Int? {
         if let p = pauses.first { return p.atS }

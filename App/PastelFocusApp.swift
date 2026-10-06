@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             save("focus-\(suffix)", FocusView().environment(\.theme, t))
             save("garden-\(suffix)", ProgressPanelView().environment(\.theme, t))
             save("dial-idle-\(suffix)", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))
+            save("dial-stopwatch-\(suffix)", TimerDial(minutes: 25, progress: 0.3, clock: "18:05", caption: "elapsed", onCommit: { _ in }, editable: false).padding(10).environment(\.theme, t))
             let demo = AppSettings()
             demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]
             save("stop-reason-\(suffix)", StopReasonCard(settings: demo, done: { _ in }, cancel: {}).frame(width: 280).environment(\.theme, t))

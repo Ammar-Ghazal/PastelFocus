@@ -31,7 +31,8 @@ public final class SessionRecorder {
     public static func focusLogLine(_ s: SessionRecord, calendar: DayCalendar) -> String {
         let span = "\(calendar.timeString(s.startedAt))–\(calendar.timeString(s.endedAt))"
         let title = s.taskTitle.map { String($0.prefix(40)) } ?? "Unassigned"
-        let minutes = "\(Int((Double(s.focusedS) / 60).rounded()))/\(s.plannedS / 60) min"
+        let done = Int((Double(s.focusedS) / 60).rounded())
+        let minutes = s.isStopwatch ? "\(done) min (stopwatch)" : "\(done)/\(s.plannedS / 60) min"
         var outcome: String
         switch s.outcome {
         case .completed: outcome = "completed"
