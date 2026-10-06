@@ -7,6 +7,14 @@ import WidgetKit
 
 enum TaskFilter: String, CaseIterable { case all = "All", focus = "Focus", later = "Later", done = "Done" }
 
+/// Values that change every second while a session runs. Kept out of `AppModel` so only the
+/// Focus panel and the menu-bar label redraw each second, not the Today list or the garden.
+@MainActor
+final class TickState: ObservableObject {
+    @Published var remainingS = 25 * 60
+    @Published var elapsedS = 0
+}
+
 struct UndoToast: Identifiable, Equatable {
     let id = UUID()
     let text: String
@@ -23,9 +31,16 @@ final class AppModel: ObservableObject {
     @Published var tasks: [TaskItem] = []
     @Published var filter: TaskFilter = .all
     @Published var phase: FocusPhase = .idle
-    @Published var remainingS = 25 * 60
     @Published var plannedS = 25 * 60
-    @Published var elapsedS = 0
+    let ticks = TickState()
+    var remainingS: Int {
+        get { ticks.remainingS }
+        set { if ticks.remainingS != newValue { ticks.remainingS = newValue } }
+    }
+    var elapsedS: Int {
+        get { ticks.elapsedS }
+        set { if ticks.elapsedS != newValue { ticks.elapsedS = newValue } }
+    }
     @Published var isStopwatch = false
     @Published var activeTitle: String?
     @Published var activeKind: SessionKind?
@@ -53,10 +68,10 @@ final class AppModel: ObservableObject {
 
     init(settings: AppSettings) {
         self.settings = settings
-        coordinator = Coordinator(config: settings.vaultConfig, preset: settings.preset)
+        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, widgetDir: settings.widgetDir, preset: settings.preset)
         coordinator.inbox.actions = self
         notifier.onAction = { [weak self] action, info in self?.handleNotification(action, info: info) }
-        hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) })
+        if AppSettings.devName == nil { hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) }) }
         observeSystem()
         settings.$focusMinutes.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.coordinator.engine.preset = settings.preset; self?.publish() } }.store(in: &bag)
         settings.$logsInVault.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
@@ -66,7 +81,7 @@ final class AppModel: ObservableObject {
 
     func rebuildCoordinator() {
         coordinator.writeNow(appRunning: false)
-        coordinator = Coordinator(config: settings.vaultConfig, preset: settings.preset)
+        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, widgetDir: settings.widgetDir, preset: settings.preset)
         coordinator.inbox.actions = self
         start()
     }
@@ -127,8 +142,13 @@ final class AppModel: ObservableObject {
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
             selectedTaskID = (tasks.first { $0.status.isOpen && $0.priority == .high } ?? tasks.first { $0.status.isOpen })?.taskID
         }
-        WidgetCenter.shared.reloadAllTimelines()
+        if c.widgetVersion != lastWidgetVersion {
+            lastWidgetVersion = c.widgetVersion
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
+
+    private var lastWidgetVersion = -1
 
     var filteredTasks: [TaskItem] { tasks(for: filter) }
 
@@ -292,7 +312,8 @@ final class AppModel: ObservableObject {
         if let r = coordinator.tick() { ended(r) }
         remainingS = coordinator.engine.remainingS
         elapsedS = coordinator.engine.elapsedS
-        phase = coordinator.engine.phase
+        // Assigning an unchanged @Published value still redraws every observer, so compare first.
+        if phase != coordinator.engine.phase { phase = coordinator.engine.phase }
     }
 
     private func ended(_ r: SessionRecord) {
@@ -405,6 +426,7 @@ final class AppModel: ObservableObject {
     }
 
     private func applyLoginItem() {
+        guard AppSettings.devName == nil else { return } // dev instances never become login items
         let service = SMAppService.mainApp
         if settings.launchAtLogin, service.status != .enabled { try? service.register() }
         if !settings.launchAtLogin, service.status == .enabled { try? service.unregister() }

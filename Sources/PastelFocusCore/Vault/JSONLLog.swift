@@ -1,16 +1,41 @@
 import Foundation
 
 /// Append-only monthly JSON Lines files, e.g. `sessions-2026-10.jsonl`. Written only by the app.
-public struct JSONLLog<Record: Codable>: Sendable {
+/// Reads are cached per file and re-parsed only when that file's size or modification date changes,
+/// so the many small reads behind each UI update cost a `stat`, not a parse.
+public struct JSONLLog<Record: Codable>: @unchecked Sendable {
     public let directory: URL
     public let prefix: String
     public let calendar: DayCalendar
+    private let cache = Cache()
+
+    final class Cache: @unchecked Sendable {
+        struct Entry { let size: Int; let mtime: Date?; let records: [Record] }
+        private var entries: [String: Entry] = [:]
+        private let lock = NSLock()
+        /// Number of files parsed (not served from cache); for tests.
+        private(set) var parses = 0
+
+        func records(for url: URL, parse: () -> [Record]) -> [Record] {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let size = (attrs?[.size] as? Int) ?? -1, mtime = attrs?[.modificationDate] as? Date
+            lock.lock(); defer { lock.unlock() }
+            if let e = entries[url.path], e.size == size, e.mtime == mtime { return e.records }
+            let r = parse()
+            parses += 1
+            entries[url.path] = Entry(size: size, mtime: mtime, records: r)
+            return r
+        }
+    }
 
     public init(directory: URL, prefix: String, calendar: DayCalendar) {
         self.directory = directory
         self.prefix = prefix
         self.calendar = calendar
     }
+
+    /// Files parsed since this log was created (cache misses). Used by tests.
+    public var parseCount: Int { cache.parses }
 
     static var encoder: JSONEncoder {
         let e = JSONEncoder()
@@ -49,9 +74,13 @@ public struct JSONLLog<Record: Codable>: Sendable {
         let files = names.filter { $0.hasPrefix(prefix + "-") && $0.hasSuffix(".jsonl") }.sorted()
         var out: [Record] = []
         for name in files {
-            guard let text = try? String(contentsOf: directory.appendingPathComponent(name), encoding: .utf8) else { continue }
-            for line in text.split(separator: "\n") where !line.isEmpty {
-                if let r = try? Self.decoder.decode(Record.self, from: Data(line.utf8)) { out.append(r) }
+            let url = directory.appendingPathComponent(name)
+            out += cache.records(for: url) {
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+                let d = Self.decoder
+                return text.split(separator: "\n").compactMap { line in
+                    line.isEmpty ? nil : try? d.decode(Record.self, from: Data(line.utf8))
+                }
             }
         }
         return out

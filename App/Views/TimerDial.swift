@@ -36,14 +36,15 @@ struct TimerDial: View {
                 .stroke(LinearGradient(colors: [theme.pink, theme.pinkLight], startPoint: .top, endPoint: .bottom),
                         style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(dragMinutes == nil && !reduceMotion ? .easeOut(duration: 0.2) : nil, value: fill)
+                // Ease only when the length is changed on the dial; a running ring moves a hair per
+                // second, and animating that every second cost ~3% CPU for no visible benefit.
+                .animation(progress == nil && dragMinutes == nil && !reduceMotion ? .easeOut(duration: 0.2) : nil, value: fill)
             if interactive { knob }
             VStack(spacing: 0) {
                 Text(interactive ? String(format: "%d:00", shown) : clock)
                     .font(.system(size: interactive || clock.count <= 5 ? 24 : 19, weight: .medium, design: .monospaced))
                     .monospacedDigit()
                     .foregroundStyle(theme.isNight ? theme.pinkLight : theme.textPrimary)
-                    .contentTransition(.numericText())
                 Text(caption).font(.system(size: 10, weight: .medium)).foregroundStyle(theme.textSecondary)
             }
         }

@@ -34,7 +34,7 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 
 | Component | Runs |
 | --- | --- |
-| PastelFocus.app | Always (login item). ~0% CPU idle, ~40 MB memory |
+| PastelFocus.app | Always (login item). 0% CPU idle, ~2% while a session runs, ~40 MB memory |
 | Inbox processing, outside-edit detection | Within ~1 s of a file change (FSEvents) |
 | Timer tick | Every second while a session runs; time is computed from the clock, so sleep/App Nap/restarts are safe |
 | Nightly pass (insights, Stats, daily summary, index) | First wake after midnight and 21:00 |
@@ -74,6 +74,18 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 `SuggestionEngine` turns insights into rare cards, only at a session start, a session end or planning — never mid-session: ≤3 per day, ≥90 min apart, each kind ≤ once per 3 days, paused 14 days after two dismissals, mutable. Every card has **Why?** with the real numbers.
 
+## Focus panel
+
+- **Timer dial:** drag the ring (or use the arrow keys) to set 5–120 min in 5-min steps; rest scales with it (about a fifth, 3–20 min; long rest ×3). While running, the ring shows time left.
+- **Stopwatch mode:** the toggle in the header switches to counting up. Stopping a stopwatch finishes it (logged as completed, `preset: "stopwatch"`, planned = actual); a forgotten one stops itself after 4 h.
+- **Stop early:** quick reasons (`interrupted`, `blocked`, `done early`), your saved reasons, or type your own and tick *Save as a quick reason*. Saved reasons are shortened to 22 characters at a word boundary; right-click one to remove it. The daily note shows the short label; the sessions log keeps your full text.
+
+## Performance notes
+
+- Per-second timer values live in `TickState`, observed only by the Focus panel and menu-bar label, so the Today list doesn't redraw every second.
+- Looping animations (garden fireflies, play-button glow) are Core Animation layers that run in the render server; the dial ring eases only when you change it, not on every tick.
+- Log files are cached per file and re-parsed only when their size or date changes; widgets reload only when their snapshot changes; generated files are written only when their content changes.
+
 ## Night Garden
 
 Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days (≥2 finished sessions) unlock a path, pond, stone lantern, red bridge, small house and waterfall. Layout is deterministic (FNV-1a seed per session), so it never reshuffles.
@@ -81,9 +93,15 @@ Each finished focus session plants a pixel sprite (species by category, size by 
 ## Build, test, install
 
 ```bash
-swift test                      # 57 unit/integration tests for PastelFocusCore
+swift test                      # 75 unit/integration tests for PastelFocusCore
 ./scripts/install.sh            # xcodegen + Release build → ~/Applications, relaunch
 ./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/PastelFocus --render-snapshots /tmp/pf   # PNGs of every panel, both themes
+```
+
+Run a separate copy for development or benchmarking without touching the installed app's timer or settings (own settings suite, temp support folder, no widgets, login item or hot keys):
+
+```bash
+PASTELFOCUS_DEV=bench ./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/PastelFocus
 ```
 
 Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXRF` (signing + App Group `58FZ49BXRF.com.ammarghazal.pastelfocus` for widgets).
@@ -97,11 +115,15 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `AnalyticsTests` | Wilson interval, thresholds, focus span, category, fatigue, estimates, postponed, reports |
 | `SuggestionTests` | Each rule, never mid-session, budget, dismissals, mute |
 | `GardenTests` | Growth rules, stable non-overlapping layout, landmarks/run, fireflies |
+| `StopReasonsTests` | Shortening, saving, de-duplication, short label in the note |
+| `DialMathTests` | Angle ↔ minutes, 5-min snapping, no wrap across 12, rest scaling |
+| `StopwatchTests` | Count up, stop = completed, pauses, 4 h cap, old state loads, analytics |
+| `LogCacheTests` | Cache hits, appends and outside edits invalidate |
 | `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, widget taps, nightly files, index rebuild |
 
 ## Settings (menu bar → Settings…)
 
-Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · preset 25/5, 50/10 or custom · NSDR audio · float panels above windows (off = desktop level) · panel visibility · Night / Day / system theme · open at login.
+Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · Night / Day / system theme · open at login.
 
 ## Code map
 

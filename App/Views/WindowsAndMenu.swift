@@ -128,11 +128,12 @@ struct MenuBarContent: View {
 /// Menu-bar label: sprout plus time left while a session runs.
 struct MenuBarLabel: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var ticks: TickState
     var body: some View {
         switch model.phase {
         case .idle: Image(systemName: "leaf")
         case .running, .paused, .resting:
-            let s = model.isStopwatch ? model.elapsedS : model.remainingS
+            let s = model.isStopwatch ? ticks.elapsedS : ticks.remainingS
             HStack(spacing: 3) {
                 Image(systemName: model.phase == .resting ? "cup.and.saucer" : "leaf.fill")
                 Text(s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%02d:%02d", s / 60, s % 60)).monospacedDigit()

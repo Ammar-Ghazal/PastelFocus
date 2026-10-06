@@ -22,6 +22,8 @@ public final class Coordinator {
     public private(set) var tasks: [TaskItem] = []
     public private(set) var insights: [Insight] = []
     public private(set) var problems: [String] = []
+    /// Bumped each time the widget snapshot actually changes, so the app reloads widgets only then.
+    public private(set) var widgetVersion = 0
 
     public init(config: VaultConfig, calendar: DayCalendar = DayCalendar(), clock: Clock = SystemClock(),
                 supportDir: URL = VaultConfig.defaultSupportDirectory, widgetDir: URL? = WidgetBridge.container,
@@ -172,6 +174,7 @@ public final class Coordinator {
         unchanged.updated = snap.updated
         if unchanged == snap { return }
         try? WidgetBridge.write(snap, to: dir)
+        widgetVersion += 1
     }
 
     /// Applies taps queued by the widgets.

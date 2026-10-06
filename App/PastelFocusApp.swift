@@ -11,7 +11,7 @@ struct PastelFocusApp: App {
         MenuBarExtra {
             MenuBarContent().environmentObject(delegate.model)
         } label: {
-            MenuBarLabel().environmentObject(delegate.model)
+            MenuBarLabel().environmentObject(delegate.model).environmentObject(delegate.model.ticks)
         }
         Window("Insights", id: "insights") {
             InsightsView().environmentObject(delegate.model).environment(\.theme, .night)
@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderSnapshots(to dir: URL) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         func save<V: View>(_ name: String, _ view: V) {
-            let r = ImageRenderer(content: view.environmentObject(model).environment(\.snapshotMode, true).padding(20).background(Color(hex: 0x6B5A7A)))
+            let r = ImageRenderer(content: view.environmentObject(model).environmentObject(model.ticks).environment(\.snapshotMode, true).padding(20).background(Color(hex: 0x6B5A7A)))
             r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation,
                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
@@ -92,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else { panels.hide("today") }
         if settings.showFocus {
             panels.show("focus", size: CGSize(width: 300, height: 230), origin: CGPoint(x: screen.maxX - 340, y: screen.maxY - 520), floating: settings.floatPanels) {
-                FocusView().environmentObject(model).environment(\.theme, t)
+                FocusView().environmentObject(model).environmentObject(model.ticks).environment(\.theme, t)
             }
         } else { panels.hide("focus") }
         if settings.showProgress {
