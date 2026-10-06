@@ -68,6 +68,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             save("today-\(suffix)", TodayView().environment(\.theme, t))
             save("focus-\(suffix)", FocusView().environment(\.theme, t))
             save("garden-\(suffix)", ProgressPanelView().environment(\.theme, t))
+            let demo = AppSettings()
+            demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]
+            save("stop-reason-\(suffix)", StopReasonCard(settings: demo, done: { _ in }, cancel: {}).frame(width: 280).environment(\.theme, t))
         }
     }
 
