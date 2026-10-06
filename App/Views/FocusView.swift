@@ -3,6 +3,8 @@ import SwiftUI
 
 struct FocusView: View {
     @EnvironmentObject var model: AppModel
+    /// Per-second values; observed here (and by the menu bar) only.
+    @EnvironmentObject var ticks: TickState
     @Environment(\.theme) var theme
     @Environment(\.snapshotMode) var snapshot
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -59,19 +61,19 @@ struct FocusView: View {
 
     private var clock: String {
         if stopwatch {
-            let s = model.phase == .idle ? 0 : model.elapsedS
+            let s = model.phase == .idle ? 0 : ticks.elapsedS
             return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%02d:%02d", s / 60, s % 60)
         }
-        let s = model.phase == .idle ? model.plannedS : model.remainingS
+        let s = model.phase == .idle ? model.plannedS : ticks.remainingS
         return String(format: "%02d:%02d", s / 60, s % 60)
     }
 
     /// Ring fill while something runs: time left for a countdown, the current hour for a stopwatch.
     /// Nil while idle in timer mode (the dial is editable).
     private var dialProgress: Double? {
-        if stopwatch { return model.phase == .idle ? 0 : Double(model.elapsedS % 3600) / 3600 }
+        if stopwatch { return model.phase == .idle ? 0 : Double(ticks.elapsedS % 3600) / 3600 }
         guard model.phase != .idle, model.plannedS > 0 else { return nil }
-        return Double(model.remainingS) / Double(model.plannedS)
+        return Double(ticks.remainingS) / Double(model.plannedS)
     }
 
     /// Two small pills; hidden while a session runs so the mode can't change mid-session.
@@ -132,14 +134,11 @@ struct FocusView: View {
                 .font(.system(size: 20, weight: .bold)).foregroundStyle(Color(hex: 0x242234))
                 .frame(width: 52, height: 52)
                 .background(Circle().fill(theme.pinkStrong))
-                .background(Circle().fill(theme.pinkStrong.opacity(breathe ? 0.20 : 0.10)).blur(radius: 9).scaleEffect(1.25))
+                .background { if !snapshot { BreathingGlow(color: NSColor(theme.pinkStrong), active: breathe).frame(width: 80, height: 80) } }
         }
         .buttonStyle(PressableStyle())
         .help("Start or pause (⌥⌘F)")
-        .onChange(of: model.phase) { _, p in
-            guard !reduceMotion else { breathe = false; return }
-            withAnimation(p == .running ? .easeInOut(duration: 2).repeatForever(autoreverses: true) : .default) { breathe = p == .running }
-        }
+        .onChange(of: model.phase, initial: true) { _, p in breathe = p == .running && !reduceMotion }
     }
 
     private var menu: some View {
@@ -378,6 +377,41 @@ struct ProgressPanelView: View {
         case .redBridge: return "red bridge"
         case .smallHouse: return "small house"
         case .waterfall: return "waterfall"
+        }
+    }
+}
+
+
+/// Soft pink halo that "breathes" while a session runs. Core Animation runs it in the render
+/// server, so it costs the app nothing per frame (the SwiftUI version cost ~6% CPU).
+struct BreathingGlow: NSViewRepresentable {
+    let color: NSColor
+    let active: Bool
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        v.wantsLayer = true
+        let g = CAGradientLayer()
+        g.type = .radial
+        g.colors = [color.withAlphaComponent(0.55).cgColor, color.withAlphaComponent(0).cgColor]
+        g.startPoint = CGPoint(x: 0.5, y: 0.5)
+        g.endPoint = CGPoint(x: 1, y: 1)
+        g.opacity = 0.18
+        v.layer?.addSublayer(g)
+        return v
+    }
+
+    func updateNSView(_ v: NSView, context: Context) {
+        guard let g = v.layer?.sublayers?.first as? CAGradientLayer else { return }
+        g.frame = v.bounds
+        if active, g.animation(forKey: "breathe") == nil {
+            let a = CABasicAnimation(keyPath: "opacity")
+            a.fromValue = 0.18; a.toValue = 0.4
+            a.duration = 2; a.autoreverses = true; a.repeatCount = .infinity
+            a.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            g.add(a, forKey: "breathe")
+        } else if !active {
+            g.removeAnimation(forKey: "breathe")
         }
     }
 }
