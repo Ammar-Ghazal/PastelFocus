@@ -150,6 +150,7 @@ final class PanelController {
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host
         panel.setFrameAutosaveName("PastelFocus.\(name)")
+        panel.setContentSize(size) // a remembered frame keeps its position, never an outdated size
         apply(floating: floating, to: panel)
         panel.orderFrontRegardless()
         panels[name] = panel

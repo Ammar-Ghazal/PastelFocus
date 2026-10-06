@@ -15,6 +15,12 @@ public struct FocusPreset: Codable, Sendable, Equatable {
     public static let deep = FocusPreset(focusMinutes: 50, shortRestMinutes: 10, longRestMinutes: 20)
 
     public var name: String { "\(focusMinutes)/\(shortRestMinutes)" }
+
+    /// Rest scaled to the chosen focus length: about a fifth, 3–20 min; long rest is three times that.
+    public static func forFocus(_ minutes: Int) -> FocusPreset {
+        let rest = min(20, max(3, Int((Double(minutes) / 5).rounded())))
+        return FocusPreset(focusMinutes: minutes, shortRestMinutes: rest, longRestMinutes: rest * 3)
+    }
 }
 
 /// The task a session is for. Nil task = "Unassigned".

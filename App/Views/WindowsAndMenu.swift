@@ -79,13 +79,9 @@ struct SettingsView: View {
                 Text("Off: Hermes can only suggest a session; you accept or dismiss it.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Timer") {
-                Picker("Preset", selection: $settings.presetName) {
-                    Text("25 / 5").tag("25/5"); Text("50 / 10").tag("50/10"); Text("Custom").tag("custom")
-                }
-                if settings.presetName == "custom" {
-                    Stepper("Focus \(settings.customFocus) min", value: $settings.customFocus, in: 10...120, step: 5)
-                    Stepper("Rest \(settings.customRest) min", value: $settings.customRest, in: 3...30)
-                }
+                Stepper("Focus length \(settings.focusMinutes) min (also set on the dial)", value: $settings.focusMinutes, in: DialMath.minMinutes...DialMath.maxMinutes, step: DialMath.step)
+                Text("Rest is about a fifth of that (\(settings.preset.shortRestMinutes) min; long rest \(settings.preset.longRestMinutes) min).")
+                    .font(.caption).foregroundStyle(.secondary)
                 TextField("NSDR audio (file path or link)", text: $settings.nsdrAudio)
             }
             Section("Panels") {

@@ -68,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             save("today-\(suffix)", TodayView().environment(\.theme, t))
             save("focus-\(suffix)", FocusView().environment(\.theme, t))
             save("garden-\(suffix)", ProgressPanelView().environment(\.theme, t))
+            save("dial-idle-\(suffix)", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))
             let demo = AppSettings()
             demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]
             save("stop-reason-\(suffix)", StopReasonCard(settings: demo, done: { _ in }, cancel: {}).frame(width: 280).environment(\.theme, t))
@@ -89,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else { panels.hide("today") }
         if settings.showFocus {
-            panels.show("focus", size: CGSize(width: 280, height: 210), origin: CGPoint(x: screen.maxX - 320, y: screen.maxY - 520), floating: settings.floatPanels) {
+            panels.show("focus", size: CGSize(width: 300, height: 230), origin: CGPoint(x: screen.maxX - 340, y: screen.maxY - 520), floating: settings.floatPanels) {
                 FocusView().environmentObject(model).environment(\.theme, t)
             }
         } else { panels.hide("focus") }
