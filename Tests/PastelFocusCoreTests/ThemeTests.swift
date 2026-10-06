@@ -1,0 +1,81 @@
+import XCTest
+@testable import PastelFocusCore
+
+final class ThemeTests: XCTestCase {
+    func testCatalogueSize() {
+        XCTAssertGreaterThanOrEqual(ThemeCatalog.all.count, 10)
+        for t in ThemeCatalog.all {
+            XCTAssertGreaterThanOrEqual(t.palettes.count, 20, t.name)
+            XCTAssertTrue(t.palettes.contains { $0.isDark } || t.palettes.contains { !$0.isDark }, t.name)
+        }
+        XCTAssertEqual(Set(ThemeCatalog.all.map(\.scene)).count, ThemeCatalog.all.count, "each theme has its own scene")
+    }
+
+    func testIDsAndNamesAreUniqueAndStable() {
+        let ids = ThemeCatalog.allPalettes.map(\.id)
+        XCTAssertEqual(Set(ids).count, ids.count)
+        for t in ThemeCatalog.all {
+            XCTAssertEqual(Set(t.palettes.map(\.name)).count, t.palettes.count, t.name)
+            XCTAssertTrue(t.palettes.allSatisfy { $0.id.hasPrefix(t.id + "/") })
+        }
+        XCTAssertEqual(PaletteBuilder.slug("Will-o'-Wisp"), "will-o-wisp")
+        XCTAssertNotNil(ThemeCatalog.theme("deep-space")?.palette("deep-space/saturn-gold"))
+    }
+
+    /// Readability rules every palette must meet, generated or hand-made.
+    func testEveryPaletteIsReadable() {
+        for p in ThemeCatalog.allPalettes {
+            let tag = "\(p.id)"
+            XCTAssertGreaterThanOrEqual(p.textPrimary.contrast(with: p.elevated), 7, "primary text \(tag)")
+            XCTAssertGreaterThanOrEqual(p.textPrimary.contrast(with: p.glass.over(p.sceneTop)), 7, "primary text on glass \(tag)")
+            XCTAssertGreaterThanOrEqual(p.textSecondary.contrast(with: p.surface), 4.5, "secondary text \(tag)")
+            XCTAssertGreaterThanOrEqual(p.textTertiary.contrast(with: p.surface), 2.8, "tertiary text \(tag)")
+            XCTAssertGreaterThanOrEqual(p.onAccent.contrast(with: p.accent), 4.5, "text on accent \(tag)")
+            for (name, c) in [("focus", p.tagFocus), ("health", p.tagHealth), ("later", p.tagLater), ("high", p.tagHigh), ("learning", p.tagLearning)] {
+                XCTAssertGreaterThanOrEqual(c.contrast(with: p.surface), 4.5, "tag \(name) \(tag)")
+            }
+        }
+    }
+
+    func testAllColoursInGamut() {
+        for p in ThemeCatalog.allPalettes {
+            let all = [p.surface, p.glass, p.elevated, p.highlight, p.track, p.border, p.borderActive, p.textPrimary, p.textSecondary,
+                       p.textTertiary, p.accentLight, p.accent, p.accentStrong, p.onAccent, p.tagFocus, p.tagHealth, p.tagLater,
+                       p.tagHigh, p.tagLearning, p.sceneTop, p.sceneBottom, p.ground, p.groundShade, p.glow, p.particle]
+            XCTAssertTrue(all.allSatisfy(\.isInGamut), p.id)
+        }
+    }
+
+    func testTagColoursAreDistinguishable() {
+        for p in ThemeCatalog.allPalettes {
+            let tags = [p.tagFocus, p.tagHealth, p.tagLater, p.tagHigh, p.tagLearning].map(OKLCH.init)
+            for i in 0..<tags.count { for j in (i + 1)..<tags.count {
+                XCTAssertGreaterThan(tags[i].distance(to: tags[j]), 0.05, "\(p.id) tags \(i)/\(j)")
+            } }
+        }
+    }
+
+    func testOriginalNightPaletteIsUnchanged() {
+        let p = ThemeCatalog.resolve(.default).1
+        XCTAssertEqual(p.name, "Midnight Blossom")
+        XCTAssertEqual(p.surface.hexString, "#111827")
+        XCTAssertEqual(p.accent.hexString, "#F6A6CF")
+        XCTAssertEqual(p.textPrimary.hexString, "#F5EDF6")
+    }
+
+    func testResolveFallsBack() {
+        let (t, p) = ThemeCatalog.resolve(ThemeSelection(themeID: "aurora", paletteID: "missing"))
+        XCTAssertEqual(t.id, "aurora")
+        XCTAssertEqual(p.id, t.defaultPalette.id)
+        XCTAssertEqual(ThemeCatalog.resolve(ThemeSelection(themeID: "nope", paletteID: "x")).0.id, "pastel-retro")
+    }
+
+    func testOKLCHRoundTripAndGamutClip() {
+        let pink = RGBA(hex: 0xF6A6CF)
+        XCTAssertEqual(OKLCH(pink).rgb().hexString, "#F6A6CF")
+        let wild = OKLCH(0.7, 0.4, 140).rgb() // far outside sRGB: chroma is reduced, not clipped per channel
+        XCTAssertTrue(wild.isInGamut)
+        XCTAssertEqual(OKLCH(wild).h, 140, accuracy: 3)
+        XCTAssertEqual(RGBA(hex: 0x000000).contrast(with: RGBA(hex: 0xFFFFFF)), 21, accuracy: 0.01)
+    }
+}
