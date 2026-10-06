@@ -1,0 +1,67 @@
+name: PastelFocus
+options:
+  bundleIdPrefix: com.ammarghazal
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: 58FZ49BXRF
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+packages:
+  PastelFocusCore:
+    path: .
+targets:
+  PastelFocus:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: PastelFocusCore
+      - target: PastelFocusWidgets
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: PastelFocus
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: "Local-first focus and tasks for Ammar"
+    entitlements:
+      path: App/PastelFocus.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - 58FZ49BXRF.com.ammarghazal.pastelfocus
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ammarghazal.pastelfocus
+        PRODUCT_NAME: PastelFocus
+  PastelFocusWidgets:
+    type: app-extension
+    platform: macOS
+    sources: [Widgets]
+    dependencies:
+      - package: PastelFocusCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: PastelFocus Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widgets/PastelFocusWidgets.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - 58FZ49BXRF.com.ammarghazal.pastelfocus
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ammarghazal.pastelfocus.widgets
+        PRODUCT_NAME: PastelFocusWidgets
+        SKIP_INSTALL: YES

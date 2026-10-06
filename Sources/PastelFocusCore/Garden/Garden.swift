@@ -85,6 +85,8 @@ public struct Garden: Sendable, Equatable {
     public var goodDays: Int
     public var currentRun: Int
     public var landmarks: [Landmark]
+
+    public static let empty = Garden(islands: [], goodDays: 0, currentRun: 0, landmarks: [])
 }
 
 /// FNV-1a: a stable hash (Swift's Hasher is randomised per launch, so layouts would reshuffle).
