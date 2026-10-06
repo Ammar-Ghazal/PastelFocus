@@ -24,6 +24,8 @@ final class AppSettings: ObservableObject {
     @Published var showToday: Bool { didSet { d.set(showToday, forKey: "showToday") } }
     @Published var showFocus: Bool { didSet { d.set(showFocus, forKey: "showFocus") } }
     @Published var showProgress: Bool { didSet { d.set(showProgress, forKey: "showProgress") } }
+    /// Custom stop-early reasons the user chose to keep (already shortened).
+    @Published var savedReasons: [String] { didSet { d.set(savedReasons, forKey: "savedReasons") } }
 
     init() {
         d.register(defaults: [
@@ -47,6 +49,7 @@ final class AppSettings: ObservableObject {
         showToday = d.bool(forKey: "showToday")
         showFocus = d.bool(forKey: "showFocus")
         showProgress = d.bool(forKey: "showProgress")
+        savedReasons = d.stringArray(forKey: "savedReasons") ?? []
     }
 
     var preset: FocusPreset {

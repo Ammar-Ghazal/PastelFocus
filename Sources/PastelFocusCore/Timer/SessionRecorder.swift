@@ -40,7 +40,8 @@ public final class SessionRecorder {
         case .sleepInterrupted: outcome = "sleep interrupted"
         case .skipped: outcome = "skipped"
         }
-        if let r = s.stopReason, s.outcome == .stoppedEarly, !r.isEmpty { outcome += " (\(r))" }
+        // The note shows a short label; the sessions log keeps the full text.
+        if let r = s.stopReason, s.outcome == .stoppedEarly, !r.isEmpty { outcome += " (\(StopReasons.shorten(r)))" }
         let pauseMin = s.pauses.reduce(0) { $0 + $1.durS } / 60
         let pauses = s.pauses.isEmpty ? "pauses 0" : "pauses \(s.pauses.count) (\(pauseMin) min)"
         return "- \(span) · 🆔 \(s.taskId ?? "none") · \(title) · \(minutes) · \(outcome) · \(pauses)"

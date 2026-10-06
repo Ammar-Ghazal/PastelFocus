@@ -46,7 +46,6 @@ struct FocusView: View {
         .background(GlassBackground(radius: 18))
         .onHover { hover = $0 }
         .overlay { cards }
-        .sheet(isPresented: $askingReason) { StopReasonSheet { reason in askingReason = false; model.stop(reason: reason) } cancel: { askingReason = false } }
     }
 
     private var clock: String {
@@ -126,7 +125,13 @@ struct FocusView: View {
     }
 
     @ViewBuilder private var cards: some View {
-        if let s = model.suggestion {
+        if askingReason {
+            StopReasonCard(settings: model.settings) { reason in
+                askingReason = false
+                model.stop(reason: reason)
+            } cancel: { askingReason = false }
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        } else if let s = model.suggestion {
             SuggestionCard(title: s.title, why: s.why, accept: actionTitle(s.action)) { model.answer(.accepted) } notNow: { model.answer(.dismissed) } mute: { model.answer(.muted) }
         } else if let (task, minutes, why) = model.hermesCard {
             SuggestionCard(title: "Hermes suggests \(minutes) min on \"\(task.title)\"", why: why ?? "Suggested by Hermes.", accept: "Start") {
@@ -181,21 +186,97 @@ struct SuggestionCard: View {
     }
 }
 
-struct StopReasonSheet: View {
+/// Inline "stop early?" card: quick reasons, saved custom reasons, or type one (optionally saved).
+struct StopReasonCard: View {
+    @Environment(\.theme) var theme
+    @ObservedObject var settings: AppSettings
     let done: (String?) -> Void
     let cancel: () -> Void
+    @State private var custom = ""
+    @State private var save = false
+    @FocusState private var typing: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Stop early?").font(.headline)
-            Text("It's logged as stopped early. Optional reason:").font(.subheadline).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                ForEach(["interrupted", "blocked", "done early"], id: \.self) { r in Button(r) { done(r) } }
-                Button("No reason") { done(nil) }
+                Text("Stop early?").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.textPrimary)
+                Spacer()
+                Button("Keep going", action: cancel).buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.pink)
+                    .keyboardShortcut(.cancelAction)
             }
-            Button("Keep going", action: cancel).keyboardShortcut(.cancelAction)
+            FlowLayout(spacing: 5) {
+                ForEach(StopReasons.builtIn + settings.savedReasons, id: \.self) { r in
+                    Button { done(r) } label: { chip(r) }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            if settings.savedReasons.contains(r) {
+                                Button("Remove saved reason") { settings.savedReasons.removeAll { $0 == r } }
+                            }
+                        }
+                }
+            }
+            HStack(spacing: 6) {
+                TextField("Other reason…", text: $custom)
+                    .textFieldStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(theme.track.opacity(0.6)))
+                    .focused($typing)
+                    .onSubmit(submit)
+                Button(action: submit) { Image(systemName: "arrow.right.circle.fill").font(.system(size: 18)) }
+                    .buttonStyle(.plain).foregroundStyle(custom.isEmpty ? theme.textTertiary : theme.pink).disabled(custom.isEmpty)
+            }
+            HStack {
+                Toggle(isOn: $save) { Text("Save as a quick reason").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
+                    .toggleStyle(.checkbox).disabled(custom.isEmpty)
+                Spacer()
+                Button("No reason") { done(nil) }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(theme.textSecondary)
+            }
         }
-        .padding(20)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(theme.elevated))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.borderActive))
+        .padding(6)
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text).font(.system(size: 11, weight: .medium)).foregroundStyle(theme.textPrimary).lineLimit(1)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Capsule().fill(theme.track))
+    }
+
+    private func submit() {
+        let text = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if save { settings.savedReasons = StopReasons.saving(text, to: settings.savedReasons) }
+        done(text)
+    }
+}
+
+/// Minimal wrapping row layout for chips.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 260
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for s in subviews {
+            let size = s.sizeThatFits(.unspecified)
+            if x + size.width > width, x > 0 { x = 0; y += rowH + spacing; rowH = 0 }
+            x += size.width + spacing
+            rowH = max(rowH, size.height)
+        }
+        return CGSize(width: width, height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
+        for s in subviews {
+            let size = s.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
+            s.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowH = max(rowH, size.height)
+        }
     }
 }
 
