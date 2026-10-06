@@ -59,22 +59,30 @@ struct Theme {
 }
 
 private struct ThemeKey: EnvironmentKey { static let defaultValue = Theme.night }
+private struct SnapshotKey: EnvironmentKey { static let defaultValue = false }
 
 extension EnvironmentValues {
     var theme: Theme {
         get { self[ThemeKey.self] }
         set { self[ThemeKey.self] = newValue }
     }
+    /// True when rendering offscreen PNGs, where AppKit-backed views can't be drawn.
+    var snapshotMode: Bool {
+        get { self[SnapshotKey.self] }
+        set { self[SnapshotKey.self] = newValue }
+    }
 }
 
 /// Glass panel background: system blur, dark tint, hairline border.
 struct GlassBackground: View {
     @Environment(\.theme) var theme
+    @Environment(\.snapshotMode) var snapshot
     var radius: CGFloat = 20
 
     var body: some View {
         ZStack {
-            VisualEffect().clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            if snapshot { RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.isNight ? Color(hex: 0x1B2436) : Color(hex: 0xF4EEF4)) }
+            else { VisualEffect().clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous)) }
             RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.glassTint)
             RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(theme.border, lineWidth: 1)
         }

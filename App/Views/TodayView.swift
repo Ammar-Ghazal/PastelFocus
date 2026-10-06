@@ -4,6 +4,7 @@ import SwiftUI
 struct TodayView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
+    @Environment(\.snapshotMode) var snapshot
     @State private var adding = false
     @State private var newText = ""
     @FocusState private var fieldFocused: Bool
@@ -101,6 +102,11 @@ struct TodayView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity)
+        } else if snapshot {
+            VStack(spacing: 4) {
+                ForEach(model.filteredTasks.prefix(7)) { t in TaskRow(task: t, highlighted: t.taskID == model.highlightedID) }
+                Spacer(minLength: 0)
+            }
         } else {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 4) {
@@ -146,6 +152,7 @@ struct TodayView: View {
 struct TaskRow: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
+    @Environment(\.snapshotMode) var snapshot
     let task: TaskItem
     let highlighted: Bool
     @State private var hover = false
@@ -176,6 +183,8 @@ struct TaskRow: View {
                 Button { model.startFocus(on: task) } label: {
                     Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.pink).frame(width: 28, height: 28)
                 }.buttonStyle(.plain).help("Start focus")
+            } else if snapshot {
+                Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary).frame(width: 28)
             } else {
                 Menu {
                     Button("Start focus") { model.startFocus(on: task) }.disabled(done)

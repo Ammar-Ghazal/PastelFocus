@@ -4,6 +4,7 @@ import SwiftUI
 struct FocusView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
+    @Environment(\.snapshotMode) var snapshot
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State private var hover = false
     @State private var askingReason = false
@@ -15,7 +16,7 @@ struct FocusView: View {
                 SpriteView(rows: Sprite.target, px: 2)
                 Text("Focus").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.pink)
                 Spacer()
-                menu
+                if snapshot { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) } else { menu }
             }
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -201,6 +202,7 @@ struct StopReasonSheet: View {
 struct ProgressPanelView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
+    @Environment(\.snapshotMode) var snapshot
     @State private var month = false
 
     var body: some View {
@@ -209,8 +211,8 @@ struct ProgressPanelView: View {
                 SpriteView(rows: Sprite.sparkle, px: 2)
                 Text("Night Garden").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.pink)
                 Spacer()
-                Picker("", selection: $month) { Text("Week").tag(false); Text("Month").tag(true) }
-                    .pickerStyle(.segmented).frame(width: 130)
+                if snapshot { Text("Week · Month").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
+                else { Picker("", selection: $month) { Text("Week").tag(false); Text("Month").tag(true) }.pickerStyle(.segmented).frame(width: 130) }
             }
             if month {
                 let islands = Array(model.garden.islands.suffix(5))

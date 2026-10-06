@@ -61,8 +61,11 @@ enum Sprite {
         let w = CGFloat(rows.map(\.count).max() ?? 0) * px, h = CGFloat(rows.count) * px
         let origin = CGPoint(x: (anchor.x - w / 2).rounded(), y: (anchor.y - h).rounded())
         if glow {
-            ctx.fill(Path(ellipseIn: CGRect(x: origin.x - px * 2, y: origin.y - px * 2, width: w + px * 4, height: h + px * 4)),
-                     with: .color(Color(hex: 0xFFD2E6, opacity: 0.18)))
+            let r = max(w, h) * 0.75
+            let c = CGPoint(x: anchor.x, y: anchor.y - h / 2)
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                     with: .radialGradient(Gradient(colors: [Color(hex: 0xF8DFA1, opacity: 0.35), Color(hex: 0xF8DFA1, opacity: 0)]),
+                                           center: c, startRadius: 0, endRadius: r))
         }
         for (y, row) in rows.enumerated() {
             for (x, ch) in row.enumerated() where ch != "." {
