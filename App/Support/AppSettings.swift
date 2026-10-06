@@ -24,8 +24,14 @@ final class AppSettings: ObservableObject {
     @Published var floatPanels: Bool { didSet { d.set(floatPanels, forKey: "floatPanels") } }
     /// Focus length chosen on the dial (5–120 min). Rest scales with it.
     @Published var focusMinutes: Int { didSet { d.set(focusMinutes, forKey: "focusMinutes") } }
-    /// "night", "day" or "system".
-    @Published var themeMode: String { didSet { d.set(themeMode, forKey: "themeMode") } }
+    /// Theme (scene) and colour combo.
+    @Published var themeSelection: ThemeSelection {
+        didSet { d.set(themeSelection.themeID, forKey: "themeID"); d.set(themeSelection.paletteID, forKey: "paletteID") }
+    }
+    /// Swap to the theme's closest light/dark palette to follow macOS appearance.
+    @Published var matchSystemAppearance: Bool { didSet { d.set(matchSystemAppearance, forKey: "matchSystemAppearance") } }
+    /// Animated scenes (stars, snow, petals…). Off = static art only; Reduce Motion also turns it off.
+    @Published var ambientMotion: Bool { didSet { d.set(ambientMotion, forKey: "ambientMotion") } }
     /// File path or URL opened when an NSDR break starts. Empty = none.
     @Published var nsdrAudio: String { didSet { d.set(nsdrAudio, forKey: "nsdrAudio") } }
     @Published var launchAtLogin: Bool { didSet { d.set(launchAtLogin, forKey: "launchAtLogin") } }
@@ -42,7 +48,7 @@ final class AppSettings: ObservableObject {
             "vaultPath": FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Obsidian Vault").path,
             "dailyFolder": "Learning Library/Career/Daily Plans",
             "logsInVault": true, "allowHermesStart": false, "floatPanels": false,
-            "focusMinutes": 25, "themeMode": "night",
+            "focusMinutes": 25, "matchSystemAppearance": false, "ambientMotion": true,
             "nsdrAudio": "", "launchAtLogin": true, "showToday": true, "showFocus": true, "showProgress": true,
         ])
         vaultPath = d.string(forKey: "vaultPath")!
@@ -58,7 +64,18 @@ final class AppSettings: ObservableObject {
         }
         d.removeObject(forKey: "presetName")
         focusMinutes = DialMath.clamp(d.integer(forKey: "focusMinutes"))
-        themeMode = d.string(forKey: "themeMode")!
+        // Migrate the old Night / Day / System choice.
+        if let old = d.string(forKey: "themeMode") {
+            let fallback = ThemeSelection.default
+            d.set(fallback.themeID, forKey: "themeID")
+            d.set(old == "day" ? "pastel-retro/morning-blossom" : fallback.paletteID, forKey: "paletteID")
+            if old == "system" { d.set(true, forKey: "matchSystemAppearance") }
+            d.removeObject(forKey: "themeMode")
+        }
+        themeSelection = ThemeSelection(themeID: d.string(forKey: "themeID") ?? ThemeSelection.default.themeID,
+                                        paletteID: d.string(forKey: "paletteID") ?? ThemeSelection.default.paletteID)
+        matchSystemAppearance = d.bool(forKey: "matchSystemAppearance")
+        ambientMotion = d.bool(forKey: "ambientMotion")
         nsdrAudio = d.string(forKey: "nsdrAudio")!
         launchAtLogin = d.bool(forKey: "launchAtLogin")
         showToday = d.bool(forKey: "showToday")

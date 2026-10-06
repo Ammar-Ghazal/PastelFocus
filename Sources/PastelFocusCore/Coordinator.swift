@@ -22,6 +22,8 @@ public final class Coordinator {
     public private(set) var tasks: [TaskItem] = []
     public private(set) var insights: [Insight] = []
     public private(set) var problems: [String] = []
+    /// Theme the app is showing; copied into the widget snapshot.
+    public var themeSelection: ThemeSelection?
     /// Bumped each time the widget snapshot actually changes, so the app reloads widgets only then.
     public private(set) var widgetVersion = 0
 
@@ -187,6 +189,7 @@ public final class Coordinator {
                                   focusedMinutesToday: focusedToday / 60, goodDays: garden().goodDays)
         snap.timerStart = engine.stopwatchStart
         snap.elapsedS = engine.isStopwatch ? engine.elapsedS : nil
+        snap.theme = themeSelection
         var unchanged = WidgetBridge.read(from: dir)
         unchanged.updated = snap.updated
         if unchanged == snap { return }

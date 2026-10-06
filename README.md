@@ -80,6 +80,29 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 - **Stopwatch mode:** the toggle in the header switches to counting up. Stopping a stopwatch finishes it (logged as completed, `preset: "stopwatch"`, planned = actual); a forgotten one stops itself after 4 h.
 - **Stop early:** quick reasons (`interrupted`, `blocked`, `done early`), your saved reasons, or type your own and tick *Save as a quick reason*. Saved reasons are shortened to 22 characters at a word boundary; right-click one to remove it. The daily note shows the short label; the sessions log keeps your full text.
 
+## Themes
+
+12 themes × 21 colour combos (252 palettes), chosen in **Settings → Appearance** (or the menu bar's Theme menu). Each theme is a scene with its own art, ambient motion and title typeface:
+
+| Theme | Scene and motion | Type |
+| --- | --- | --- |
+| Pastel Retro | Dark glass, pixel sparkles (the original look) | SF |
+| Deep Space | Twinkling stars, planets orbiting a glowing sun | SF |
+| Enchanted Forest | Misty pines, drifting fireflies | Serif |
+| Ocean Depths | Light rays, rising bubbles | Rounded |
+| Synthwave | Striped neon sun, horizon grid | SF |
+| Zen Paper | Paper grain, ink ensō, no motion | Serif |
+| Cozy Autumn | Warm glow, falling leaves | Serif |
+| Aurora | Swaying aurora ribbons over a ridge | SF |
+| Desert Dusk | Dunes, low sun, blowing sand | SF |
+| Sakura Garden | Blossom branch, drifting petals | Rounded |
+| Retro Terminal | CRT scanlines, blinking cursor | Mono |
+| Winter Snowfall | Snowfall over hills and pines | Rounded |
+
+**How palettes are made (`Sources/PastelFocusCore/Theme`).** Each combo is a one-line spec — mode, background hue, accent hue, vibrance, tag hues. `PaletteBuilder` derives all 25 tokens in OKLCH (perceptual lightness/chroma, gamut-mapped to sRGB), then enforces WCAG contrast: primary text ≥ 7:1, secondary ≥ 4.5:1, tags ≥ 4.5:1, and text on accent fills ≥ 4.5:1 (dark or light text, whichever reads better). `ThemeTests` checks every palette for these, for in-gamut colours, unique IDs, and tag colours that stay distinguishable. The original Midnight Blossom palette is kept exactly.
+
+**Where it renders.** `Shared/ThemeKit.swift` (tokens → SwiftUI) and `Shared/SceneArt.swift` (static scene art, drawn once with `Canvas`) are compiled into both the app and the widget extension, so widgets show the same scene and colours; the widget snapshot carries the active theme. The app adds `AmbientScene` — Core Animation layers and particle emitters (0% app CPU). *Ambient motion* and macOS Reduce Motion switch it off. *Match macOS light/dark* swaps to the theme's closest combo of the other mode.
+
 ## Performance notes
 
 - Per-second timer values live in `TickState`, observed only by the Focus panel and menu-bar label, so the Today list doesn't redraw every second.
@@ -93,7 +116,7 @@ Each finished focus session plants a pixel sprite (species by category, size by 
 ## Build, test, install
 
 ```bash
-swift test                      # 75 unit/integration tests for PastelFocusCore
+swift test                      # 86 unit/integration tests for PastelFocusCore
 ./scripts/install.sh            # xcodegen + Release build → ~/Applications, relaunch
 ./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/PastelFocus --render-snapshots /tmp/pf   # PNGs of every panel, both themes
 ```
@@ -119,11 +142,12 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `DialMathTests` | Angle ↔ minutes, 5-min snapping, no wrap across 12, rest scaling |
 | `StopwatchTests` | Count up, stop = completed, pauses, 4 h cap, old state loads, analytics |
 | `LogCacheTests` | Cache hits, appends and outside edits invalidate |
+| `ThemeTests` | 12 themes × 21 palettes: contrast, gamut, unique IDs, distinguishable tags, light/dark matching |
 | `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, widget taps, nightly files, index rebuild |
 
 ## Settings (menu bar → Settings…)
 
-Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · Night / Day / system theme · open at login.
+Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · open at login. Appearance tab: theme, colour combo, ambient motion, match macOS light/dark.
 
 ## Code map
 
