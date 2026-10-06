@@ -1,90 +1,36 @@
 import SwiftUI
 
-extension Color {
-    init(hex: UInt32, opacity: Double = 1) {
-        self.init(.sRGB, red: Double((hex >> 16) & 0xff) / 255, green: Double((hex >> 8) & 0xff) / 255,
-                  blue: Double(hex & 0xff) / 255, opacity: opacity)
-    }
-}
-
-/// Design tokens from the spec. Night is the default; Day is the proposed pastel-light theme.
-struct Theme {
-    let glassTint: Color
-    let elevated: Color
-    let highlight: Color
-    let border: Color
-    let borderActive: Color
-    let textPrimary: Color
-    let textSecondary: Color
-    let textTertiary: Color
-    let pinkLight: Color
-    let pink: Color
-    let pinkStrong: Color
-    let lavender: Color
-    let mint: Color
-    let cream: Color
-    let coral: Color
-    let cyan: Color
-    let track: Color
-    let onPink: Color
-    let isNight: Bool
-
-    static let night = Theme(
-        glassTint: Color(hex: 0x0C121F, opacity: 0.78), elevated: Color(hex: 0x1A2032), highlight: Color(hex: 0x493847),
-        border: Color.white.opacity(0.08), borderActive: Color(hex: 0xF6A6CF, opacity: 0.38),
-        textPrimary: Color(hex: 0xF5EDF6), textSecondary: Color(hex: 0xAAA9BA), textTertiary: Color(hex: 0x727386),
-        pinkLight: Color(hex: 0xFFD2E6), pink: Color(hex: 0xF6A6CF), pinkStrong: Color(hex: 0xF28AB8),
-        lavender: Color(hex: 0xB9B7FF), mint: Color(hex: 0x91E0BF), cream: Color(hex: 0xF8DFA1), coral: Color(hex: 0xFF8291),
-        cyan: Color(hex: 0x8DE4E6), track: Color(hex: 0x303548), onPink: Color(hex: 0x252338), isNight: true)
-
-    static let day = Theme(
-        glassTint: Color(hex: 0xFFF8FC, opacity: 0.80), elevated: Color(hex: 0xF6EAF3), highlight: Color(hex: 0xFBDDEB),
-        border: Color(hex: 0x3A3346, opacity: 0.08), borderActive: Color(hex: 0xE77FB0, opacity: 0.45),
-        textPrimary: Color(hex: 0x3A3346), textSecondary: Color(hex: 0x7A7088), textTertiary: Color(hex: 0x9A90A8),
-        pinkLight: Color(hex: 0xFFE3F0), pink: Color(hex: 0xE99BC4), pinkStrong: Color(hex: 0xE77FB0),
-        lavender: Color(hex: 0x6E6AD8), mint: Color(hex: 0x3C9C78), cream: Color(hex: 0xB88A1E), coral: Color(hex: 0xD9536A),
-        cyan: Color(hex: 0x2E8F99), track: Color(hex: 0xEBDDE7), onPink: Color(hex: 0x3A3346), isNight: false)
-
-    /// Tag colour by category/priority word.
-    func tagColor(_ tag: String) -> Color {
-        switch tag.lowercased() {
-        case "high": return coral
-        case "focus", "coding", "career": return lavender
-        case "health": return mint
-        case "later": return cream
-        case "learning": return cyan
-        default: return pink
-        }
-    }
-}
-
-private struct ThemeKey: EnvironmentKey { static let defaultValue = Theme.night }
-private struct SnapshotKey: EnvironmentKey { static let defaultValue = false }
+private struct AmbientMotionKey: EnvironmentKey { static let defaultValue = true }
 
 extension EnvironmentValues {
-    var theme: Theme {
-        get { self[ThemeKey.self] }
-        set { self[ThemeKey.self] = newValue }
-    }
-    /// True when rendering offscreen PNGs, where AppKit-backed views can't be drawn.
-    var snapshotMode: Bool {
-        get { self[SnapshotKey.self] }
-        set { self[SnapshotKey.self] = newValue }
+    /// Settings → Appearance → Ambient motion. Off (or Reduce Motion) = static scenes only.
+    var ambientMotion: Bool {
+        get { self[AmbientMotionKey.self] }
+        set { self[AmbientMotionKey.self] = newValue }
     }
 }
 
-/// Glass panel background: system blur, dark tint, hairline border.
+/// Panel background: system blur, the palette's glass tint, the theme's scene art (and ambient
+/// motion when allowed), a hairline border and a drag area.
 struct GlassBackground: View {
     @Environment(\.theme) var theme
     @Environment(\.snapshotMode) var snapshot
+    @Environment(\.ambientMotion) var ambientMotion
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     var radius: CGFloat = 20
+    /// How strongly the scene shows through. Text-heavy panels use less so rows stay easy to read.
+    var sceneOpacity: Double = 0.55
+
+    private var animate: Bool { ambientMotion && !reduceMotion && !snapshot }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         ZStack {
-            if snapshot { RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.isNight ? Color(hex: 0x1B2436) : Color(hex: 0xF4EEF4)) }
-            else { VisualEffect().clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous)) }
-            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.glassTint)
-            RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(theme.border, lineWidth: 1)
+            if snapshot { shape.fill(theme.surface) } else { VisualEffect().clipShape(shape) }
+            shape.fill(theme.glassTint)
+            SceneArt(theme: theme, includeMovers: !animate).opacity(sceneOpacity).clipShape(shape)
+            if animate { AmbientScene(theme: theme).opacity(min(1, sceneOpacity * 1.5)).clipShape(shape) }
+            shape.strokeBorder(theme.border, lineWidth: 1)
             // Any empty part of the panel (header, padding, gaps) drags the window.
             if !snapshot { WindowDragArea() }
         }

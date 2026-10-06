@@ -33,7 +33,7 @@ struct TimerDial: View {
             ticks
             Circle()
                 .trim(from: 0, to: fill)
-                .stroke(LinearGradient(colors: [theme.pink, theme.pinkLight], startPoint: .top, endPoint: .bottom),
+                .stroke(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .top, endPoint: .bottom),
                         style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 // Ease only when the length is changed on the dial; a running ring moves a hair per
@@ -44,7 +44,7 @@ struct TimerDial: View {
                 Text(interactive ? String(format: "%d:00", shown) : clock)
                     .font(.system(size: interactive || clock.count <= 5 ? 24 : 19, weight: .medium, design: .monospaced))
                     .monospacedDigit()
-                    .foregroundStyle(theme.isNight ? theme.pinkLight : theme.textPrimary)
+                    .foregroundStyle(theme.isNight ? theme.accentLight : theme.textPrimary)
                 Text(caption).font(.system(size: 10, weight: .medium)).foregroundStyle(theme.textSecondary)
             }
         }
@@ -98,8 +98,8 @@ struct TimerDial: View {
     private var knob: some View {
         let angle = DialMath.fraction(shown) * 2 * .pi
         let r = size / 2
-        return Circle().fill(theme.pinkLight)
-            .overlay(Circle().strokeBorder(theme.pinkStrong, lineWidth: 2))
+        return Circle().fill(theme.accentLight)
+            .overlay(Circle().strokeBorder(theme.accentStrong, lineWidth: 2))
             .frame(width: 15, height: 15)
             .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             .offset(x: r * sin(angle), y: -r * cos(angle))

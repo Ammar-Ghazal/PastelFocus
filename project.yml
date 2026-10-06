@@ -20,7 +20,7 @@ targets:
   PastelFocus:
     type: application
     platform: macOS
-    sources: [App]
+    sources: [App, Shared]
     dependencies:
       - package: PastelFocusCore
       - target: PastelFocusWidgets
@@ -43,7 +43,7 @@ targets:
   PastelFocusWidgets:
     type: app-extension
     platform: macOS
-    sources: [Widgets]
+    sources: [Widgets, Shared]
     dependencies:
       - package: PastelFocusCore
       - sdk: WidgetKit.framework

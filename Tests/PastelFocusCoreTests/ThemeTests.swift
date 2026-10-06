@@ -70,6 +70,18 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(ThemeCatalog.resolve(ThemeSelection(themeID: "nope", paletteID: "x")).0.id, "pastel-retro")
     }
 
+    func testMatchSystemPicksClosestCounterpart() {
+        let sel = ThemeSelection(themeID: "pastel-retro", paletteID: "pastel-retro/midnight-blossom")
+        XCTAssertEqual(ThemeCatalog.resolve(sel, matchSystem: false, systemDark: false).1.name, "Midnight Blossom")
+        XCTAssertEqual(ThemeCatalog.resolve(sel, matchSystem: true, systemDark: true).1.name, "Midnight Blossom")
+        let light = ThemeCatalog.resolve(sel, matchSystem: true, systemDark: false).1
+        XCTAssertFalse(light.isDark)
+        XCTAssertEqual(OKLCH(light.accent).h, OKLCH(RGBA(hex: 0xF6A6CF)).h, accuracy: 25, "keeps a pink accent")
+        for t in ThemeCatalog.all {
+            XCTAssertTrue(t.palettes.contains { $0.isDark } && t.palettes.contains { !$0.isDark }, "\(t.name) needs both modes for matching")
+        }
+    }
+
     func testOKLCHRoundTripAndGamutClip() {
         let pink = RGBA(hex: 0xF6A6CF)
         XCTAssertEqual(OKLCH(pink).rgb().hexString, "#F6A6CF")

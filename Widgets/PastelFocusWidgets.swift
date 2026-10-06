@@ -56,13 +56,21 @@ struct TimerIntent: AppIntent {
 
 // MARK: Style
 
-private let navy = Color(red: 0.067, green: 0.094, blue: 0.153)
-private let pink = Color(red: 0.965, green: 0.651, blue: 0.812)
-private let pinkLight = Color(red: 1, green: 0.824, blue: 0.902)
-private let textPrimary = Color(red: 0.961, green: 0.929, blue: 0.965)
-private let textSecondary = Color(red: 0.667, green: 0.663, blue: 0.729)
-private let coral = Color(red: 1, green: 0.51, blue: 0.569)
-private let lavender = Color(red: 0.725, green: 0.718, blue: 1)
+extension WidgetSnapshot {
+    /// The app's current theme and colour combo (falls back to the default theme).
+    var themed: Theme { Theme(theme ?? .default) }
+}
+
+/// Widget background: the theme's static scene under its glass tint, so text stays readable.
+struct WidgetBackdrop: View {
+    let theme: Theme
+    var body: some View {
+        ZStack {
+            SceneArt(theme: theme)
+            theme.glassTint.opacity(0.55)
+        }
+    }
+}
 
 // MARK: Today widget
 
@@ -72,33 +80,34 @@ struct TodayWidgetView: View {
 
     var body: some View {
         let s = entry.snapshot
+        let t = s.themed
         let rows = Array(s.tasks.prefix(family == .systemLarge || family == .systemExtraLarge ? 6 : 3))
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("✦ Today").font(.system(size: 17, weight: .bold)).foregroundStyle(pink)
+                Text("✦ Today").font(t.titleFont(17)).foregroundStyle(t.accent)
                 Spacer()
-                Text("\(s.doneCount)/\(s.totalCount)").font(.system(size: 12, weight: .semibold)).foregroundStyle(textSecondary)
+                Text("\(s.doneCount)/\(s.totalCount)").font(.system(size: 12, weight: .semibold)).foregroundStyle(t.textSecondary)
             }
             if rows.isEmpty {
-                Text("No tasks planned yet").font(.system(size: 12)).foregroundStyle(textSecondary)
+                Text("No tasks planned yet").font(.system(size: 12)).foregroundStyle(t.textSecondary)
             }
             ForEach(rows, id: \.id) { r in
                 Button(intent: ToggleTaskIntent(taskID: r.id)) {
                     HStack(spacing: 8) {
-                        Image(systemName: r.done ? "checkmark.square.fill" : "square").foregroundStyle(r.done ? pinkLight : textSecondary)
+                        Image(systemName: r.done ? "checkmark.square.fill" : "square").foregroundStyle(r.done ? t.accent : t.textSecondary)
                         Text(r.title).font(.system(size: 13, weight: .semibold)).strikethrough(r.done)
-                            .foregroundStyle(r.done ? textSecondary : textPrimary).lineLimit(1)
+                            .foregroundStyle(r.done ? t.textSecondary : t.textPrimary).lineLimit(1)
                         Spacer()
-                        if r.high, !r.done { Text("High").font(.system(size: 10, weight: .semibold)).foregroundStyle(coral) }
-                        else if let t = r.tag { Text(t).font(.system(size: 10, weight: .semibold)).foregroundStyle(lavender) }
+                        if r.high, !r.done { Text("High").font(.system(size: 10, weight: .semibold)).foregroundStyle(t.tagHigh) }
+                        else if let tag = r.tag { Text(tag).font(.system(size: 10, weight: .semibold)).foregroundStyle(t.tagFocus) }
                     }
                 }
                 .buttonStyle(.plain)
             }
             Spacer(minLength: 0)
-            ProgressView(value: s.progress).tint(pink)
+            ProgressView(value: s.progress).tint(t.accent)
         }
-        .containerBackground(navy, for: .widget)
+        .containerBackground(for: .widget) { WidgetBackdrop(theme: t) }
     }
 }
 
@@ -117,36 +126,37 @@ struct FocusWidgetView: View {
     let entry: SnapshotEntry
     var body: some View {
         let s = entry.snapshot
+        let t = s.themed
         VStack(alignment: .leading, spacing: 6) {
-            Text("◎ Focus").font(.system(size: 15, weight: .semibold)).foregroundStyle(pink)
+            Text("◎ Focus").font(t.titleFont(15, .semibold)).foregroundStyle(t.accent)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     if let start = s.timerStart, s.phase == .running {
                         Text(start, style: .timer) // counts up by itself
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
                     } else if let elapsed = s.elapsedS {
                         Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
                     } else if let end = s.timerEnd, s.phase == .running || s.phase == .resting, end > entry.date {
                         Text(timerInterval: entry.date...end, countsDown: true)
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
                     } else {
                         Text(String(format: "%02d:%02d", s.remainingS / 60, s.remainingS % 60))
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(pinkLight)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
                     }
-                    Text(s.phase == .paused ? "Paused" : s.timerTitle).font(.system(size: 12)).foregroundStyle(textSecondary).lineLimit(1)
+                    Text(s.phase == .paused ? "Paused" : s.timerTitle).font(.system(size: 12)).foregroundStyle(t.textSecondary).lineLimit(1)
                 }
                 Spacer()
                 let action: WidgetCommand.Action = s.phase == .running ? .pauseFocus : s.phase == .paused ? .resumeFocus : .startFocus
                 Button(intent: TimerIntent(action: action)) {
                     Image(systemName: s.phase == .running ? "pause.fill" : "play.fill").font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Color(red: 0.14, green: 0.13, blue: 0.2)).frame(width: 44, height: 44).background(Circle().fill(pink))
+                        .foregroundStyle(t.onAccent).frame(width: 44, height: 44).background(Circle().fill(t.accent))
                 }
                 .buttonStyle(.plain)
             }
-            Text("\(s.focusedMinutesToday) min focused today").font(.system(size: 11)).foregroundStyle(textSecondary)
+            Text("\(s.focusedMinutesToday) min focused today").font(.system(size: 11)).foregroundStyle(t.textSecondary)
         }
-        .containerBackground(navy, for: .widget)
+        .containerBackground(for: .widget) { WidgetBackdrop(theme: t) }
     }
 }
 
@@ -165,16 +175,17 @@ struct ProgressWidgetView: View {
     let entry: SnapshotEntry
     var body: some View {
         let s = entry.snapshot
+        let t = s.themed
         VStack(alignment: .leading, spacing: 6) {
-            Text("PROGRESS").font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(pink)
-            Text("\(Int((s.progress * 100).rounded()))%").font(.system(size: 30, weight: .bold, design: .rounded)).foregroundStyle(textPrimary)
-            ProgressView(value: s.progress).tint(pink)
-            Text("\(s.doneCount) of \(s.totalCount) tasks · \(s.goodDays) good days").font(.system(size: 10)).foregroundStyle(textSecondary)
+            Text("PROGRESS").font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(t.accent)
+            Text("\(Int((s.progress * 100).rounded()))%").font(.system(size: 30, weight: .bold, design: .rounded)).foregroundStyle(t.textPrimary)
+            ProgressView(value: s.progress).tint(t.accent)
+            Text("\(s.doneCount) of \(s.totalCount) tasks · \(s.goodDays) good days").font(.system(size: 10)).foregroundStyle(t.textSecondary)
             if let n = s.nextTask {
-                Text("Next: \(n.title)").font(.system(size: 11, weight: .semibold)).foregroundStyle(textPrimary).lineLimit(2)
+                Text("Next: \(n.title)").font(.system(size: 11, weight: .semibold)).foregroundStyle(t.textPrimary).lineLimit(2)
             }
         }
-        .containerBackground(navy, for: .widget)
+        .containerBackground(for: .widget) { WidgetBackdrop(theme: t) }
     }
 }
 

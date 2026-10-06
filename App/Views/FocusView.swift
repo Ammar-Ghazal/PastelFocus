@@ -16,7 +16,7 @@ struct FocusView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 SpriteView(rows: Sprite.target, px: 2)
-                Text("Focus").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.pink)
+                Text("Focus").font(theme.titleFont(17, .semibold)).foregroundStyle(theme.accent)
                 Spacer()
                 modeToggle
                 if snapshot { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) } else { menu }
@@ -42,7 +42,7 @@ struct FocusView: View {
                         }
                     }
                     HStack(spacing: 6) {
-                        ForEach(0..<4) { i in Circle().fill(i == model.cycleIndex ? theme.pink : theme.track).frame(width: 6, height: 6) }
+                        ForEach(0..<4) { i in Circle().fill(i == model.cycleIndex ? theme.accent : theme.track).frame(width: 6, height: 6) }
                     }
                 }
                 Spacer(minLength: 0)
@@ -85,9 +85,9 @@ struct FocusView: View {
                     Button { model.settings.stopwatchMode = sw; model.objectWillChange.send() } label: {
                         Image(systemName: sw ? "stopwatch" : "timer")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(on ? theme.onPink : theme.textSecondary)
+                            .foregroundStyle(on ? theme.onAccent : theme.textSecondary)
                             .frame(width: 26, height: 20)
-                            .background(Capsule().fill(on ? theme.pink : .clear))
+                            .background(Capsule().fill(on ? theme.accent : .clear))
                     }
                     .buttonStyle(.plain)
                     .help(sw ? "Stopwatch: count up, stop when you're done" : "Timer: count down from the dial")
@@ -131,10 +131,10 @@ struct FocusView: View {
             }
         } label: {
             Image(systemName: model.phase == .running || model.phase == .resting ? "pause.fill" : "play.fill")
-                .font(.system(size: 20, weight: .bold)).foregroundStyle(Color(hex: 0x242234))
+                .font(.system(size: 20, weight: .bold)).foregroundStyle(theme.onAccent)
                 .frame(width: 52, height: 52)
-                .background(Circle().fill(theme.pinkStrong))
-                .background { if !snapshot { BreathingGlow(color: NSColor(theme.pinkStrong), active: breathe).frame(width: 80, height: 80) } }
+                .background(Circle().fill(theme.accentStrong))
+                .background { if !snapshot { BreathingGlow(color: NSColor(theme.accentStrong), active: breathe).frame(width: 80, height: 80) } }
         }
         .buttonStyle(PressableStyle())
         .help("Start or pause (⌥⌘F)")
@@ -217,9 +217,9 @@ struct SuggestionCard: View {
             Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.textPrimary).fixedSize(horizontal: false, vertical: true)
             if showWhy { Text(why).font(.system(size: 11)).foregroundStyle(theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
             HStack(spacing: 10) {
-                Button(accept, action: onAccept).buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.onPink)
-                    .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(theme.pink))
-                Button(showWhy ? "Hide" : "Why?") { showWhy.toggle() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.pink)
+                Button(accept, action: onAccept).buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.onAccent)
+                    .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(theme.accent))
+                Button(showWhy ? "Hide" : "Why?") { showWhy.toggle() }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.accent)
                 Button("Not now", action: notNow).buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.textSecondary)
                 Spacer()
                 Menu { Button("Don't suggest this", action: mute) } label: { Image(systemName: "ellipsis") }
@@ -248,7 +248,7 @@ struct StopReasonCard: View {
             HStack {
                 Text("Stop early?").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.textPrimary)
                 Spacer()
-                Button("Keep going", action: cancel).buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.pink)
+                Button("Keep going", action: cancel).buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(theme.accent)
                     .keyboardShortcut(.cancelAction)
             }
             FlowLayout(spacing: 5) {
@@ -270,7 +270,7 @@ struct StopReasonCard: View {
                     .focused($typing)
                     .onSubmit(submit)
                 Button(action: submit) { Image(systemName: "arrow.right.circle.fill").font(.system(size: 18)) }
-                    .buttonStyle(.plain).foregroundStyle(custom.isEmpty ? theme.textTertiary : theme.pink).disabled(custom.isEmpty)
+                    .buttonStyle(.plain).foregroundStyle(custom.isEmpty ? theme.textTertiary : theme.accent).disabled(custom.isEmpty)
             }
             HStack {
                 Toggle(isOn: $save) { Text("Save as a quick reason").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
@@ -337,7 +337,7 @@ struct ProgressPanelView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 SpriteView(rows: Sprite.sparkle, px: 2)
-                Text("Night Garden").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.pink)
+                Text("Night Garden").font(theme.titleFont(17, .semibold)).foregroundStyle(theme.accent)
                 Spacer()
                 if snapshot { Text("Week · Month").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
                 else { Picker("", selection: $month) { Text("Week").tag(false); Text("Month").tag(true) }.pickerStyle(.segmented).frame(width: 130) }

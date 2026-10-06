@@ -23,7 +23,7 @@ struct TodayView: View {
         }
         .padding(.horizontal, 24).padding(.vertical, 22)
         .frame(width: 560, height: 690)
-        .background(GlassBackground())
+        .background(GlassBackground(sceneOpacity: 0.28))
         .overlay(alignment: .bottom) { ToastView().padding(.bottom, 12) }
     }
 
@@ -32,7 +32,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
                     SpriteView(rows: Sprite.sparkle, px: 3)
-                    Text("Today").font(.system(size: 28, weight: .bold)).tracking(-0.5).foregroundStyle(theme.pink)
+                    Text("Today").font(theme.titleFont(28)).tracking(-0.5).foregroundStyle(theme.accent)
                 }
                 Text("“\(Self.quotes[Calendar.current.component(.day, from: Date()) % Self.quotes.count])”")
                     .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
@@ -43,7 +43,7 @@ struct TodayView: View {
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textSecondary)
                 if model.problemsCount > 0 {
                     Label("\(model.problemsCount) unreadable line\(model.problemsCount == 1 ? "" : "s")", systemImage: "exclamationmark.triangle")
-                        .font(.system(size: 11)).foregroundStyle(theme.cream)
+                        .font(.system(size: 11)).foregroundStyle(theme.tagLater)
                         .help("See PastelFocus/Problems.md in your vault")
                 }
             }
@@ -61,15 +61,15 @@ struct TodayView: View {
                     }
                     .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 16).frame(height: 34)
-                    .foregroundStyle(active ? Color(hex: 0x7D4568) : theme.textSecondary)
-                    .background(Capsule().fill(active ? AnyShapeStyle(LinearGradient(colors: [theme.pinkLight, theme.pink], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(theme.elevated)))
+                    .foregroundStyle(active ? theme.onAccent : theme.textSecondary)
+                    .background(Capsule().fill(active ? AnyShapeStyle(LinearGradient(colors: [theme.accentLight, theme.accent], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(theme.elevated)))
                 }
                 .buttonStyle(.plain)
             }
             Spacer()
             Button { withAnimation(.easeOut(duration: 0.2)) { adding.toggle(); fieldFocused = adding } } label: {
-                Image(systemName: adding ? "xmark" : "plus").font(.system(size: 20, weight: .semibold)).foregroundStyle(theme.onPink)
-                    .frame(width: 48, height: 48).background(RoundedRectangle(cornerRadius: 9).fill(theme.pink))
+                Image(systemName: adding ? "xmark" : "plus").font(.system(size: 20, weight: .semibold)).foregroundStyle(theme.onAccent)
+                    .frame(width: 48, height: 48).background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
             }
             .buttonStyle(PressableStyle())
             .help("Add a task (Enter to save, Esc to cancel)")
@@ -97,8 +97,8 @@ struct TodayView: View {
                 SpriteView(rows: Sprite.catMascot, px: 4)
                 Text("Hermes hasn't planned today yet").font(.system(size: 15, weight: .semibold)).foregroundStyle(theme.textPrimary)
                 Button("Create empty note") { model.createTodayNote() }
-                    .buttonStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.onPink)
-                    .padding(.horizontal, 14).padding(.vertical, 8).background(Capsule().fill(theme.pink))
+                    .buttonStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.onAccent)
+                    .padding(.horizontal, 14).padding(.vertical, 8).background(Capsule().fill(theme.accent))
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -132,7 +132,7 @@ struct TodayView: View {
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4).fill(theme.track)
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(LinearGradient(colors: [theme.pink, theme.pinkLight], startPoint: .leading, endPoint: .trailing))
+                            .fill(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .leading, endPoint: .trailing))
                             .frame(width: g.size.width * fraction)
                             .animation(.spring(response: 0.45), value: fraction)
                     }
@@ -166,7 +166,7 @@ struct TaskRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title).font(.system(size: 15, weight: .semibold))
                     .strikethrough(done, color: theme.textTertiary)
-                    .foregroundStyle(done ? Color(hex: 0x858392) : theme.textPrimary)
+                    .foregroundStyle(done ? theme.textTertiary : theme.textPrimary)
                     .lineLimit(1)
                     .onTapGesture { model.openInObsidian(task) }
                 HStack(spacing: 6) {
@@ -181,7 +181,7 @@ struct TaskRow: View {
             else if let c = task.isLater ? "Later" : task.category?.capitalized { TagChip(text: c) }
             if highlighted && !done {
                 Button { model.startFocus(on: task) } label: {
-                    Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.pink).frame(width: 28, height: 28)
+                    Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.accent).frame(width: 28, height: 28)
                 }.buttonStyle(.plain).help("Start focus")
             } else if snapshot {
                 Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary).frame(width: 28)
@@ -196,7 +196,7 @@ struct TaskRow: View {
         }
         .padding(.horizontal, 14).frame(height: 60)
         .background(RoundedRectangle(cornerRadius: 10).fill(highlighted && !done ? theme.highlight : (hover ? Color.white.opacity(0.035) : .clear)))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(highlighted && !done ? theme.pink.opacity(0.2) : .clear))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(highlighted && !done ? theme.accent.opacity(0.2) : .clear))
         .onHover { h in withAnimation(.easeOut(duration: 0.14)) { hover = h } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .high ? ", high priority" : "")")
@@ -212,9 +212,9 @@ struct Checkbox: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                RoundedRectangle(cornerRadius: 5).strokeBorder(Color(hex: 0xD5B5D0), lineWidth: 1.5)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(checked ? theme.pinkLight : .clear))
-                if checked { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Color(hex: 0x252338)) }
+                RoundedRectangle(cornerRadius: 5).strokeBorder(theme.textTertiary, lineWidth: 1.5)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(checked ? theme.accentLight : .clear))
+                if checked { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.onAccent) }
             }
             .frame(width: 20, height: 20)
             .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.7), value: checked)
@@ -237,7 +237,7 @@ struct ToastView: View {
         if let t = model.toast {
             HStack(spacing: 12) {
                 Text(t.text).font(.system(size: 12)).foregroundStyle(theme.textPrimary).lineLimit(1)
-                Button("Undo") { t.undo(); model.toast = nil }.buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.pink)
+                Button("Undo") { t.undo(); model.toast = nil }.buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.accent)
                 Button { model.toast = nil } label: { Image(systemName: "xmark").font(.system(size: 10)) }.buttonStyle(.plain).foregroundStyle(theme.textSecondary)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)

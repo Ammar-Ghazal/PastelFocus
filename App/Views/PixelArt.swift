@@ -92,6 +92,7 @@ struct SpriteView: View {
 
 /// One week's island: pixel plants on a grid, landmarks, fireflies drifting at 8 fps.
 struct IslandView: View {
+    @Environment(\.theme) private var theme
     let island: Island?
     let landmarks: [Landmark]
     var cell: CGFloat = 26
@@ -132,9 +133,9 @@ struct IslandView: View {
         let ox = (size.width - w) / 2, oy: CGFloat = 16
         // Island ground: layered rounded blobs.
         let ground = Path(roundedRect: CGRect(x: ox - 8, y: oy + 6, width: w + 16, height: h + 4), cornerRadius: 22)
-        ctx.fill(ground, with: .color(Color(hex: 0x2D4A44)))
-        ctx.fill(Path(roundedRect: CGRect(x: ox - 4, y: oy + 2, width: w + 8, height: h), cornerRadius: 20), with: .color(Color(hex: 0x3E6658)))
-        ctx.fill(Path(roundedRect: CGRect(x: ox - 8, y: oy + h + 2, width: w + 16, height: 10), cornerRadius: 5), with: .color(Color(hex: 0x1E2A3A)))
+        ctx.fill(ground, with: .color(theme.groundShade))
+        ctx.fill(Path(roundedRect: CGRect(x: ox - 4, y: oy + 2, width: w + 8, height: h), cornerRadius: 20), with: .color(theme.ground))
+        ctx.fill(Path(roundedRect: CGRect(x: ox - 8, y: oy + h + 2, width: w + 16, height: 10), cornerRadius: 5), with: .color(theme.sceneTop))
 
         func centre(_ x: Int, _ y: Int) -> CGPoint { CGPoint(x: ox + (CGFloat(x) + 0.5) * cell, y: oy + (CGFloat(y) + 1) * cell) }
 
@@ -192,26 +193,27 @@ struct IslandView: View {
 
 /// Monthly postcard rendered to PNG at month end.
 struct PostcardView: View {
+    @Environment(\.theme) private var theme
     let month: String
     let islands: [Island]
     let garden: Garden
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("✦ \(month)").font(.system(size: 22, weight: .bold)).foregroundStyle(Color(hex: 0xF5B4D5))
+            Text("✦ \(month)").font(theme.titleFont(22)).foregroundStyle(theme.accent)
             HStack(spacing: 10) {
                 ForEach(islands, id: \.week) { island in
                     VStack(spacing: 4) {
                         IslandView(island: island, landmarks: garden.landmarks, cell: 14, animate: false)
-                        Text(island.week).font(.system(size: 10, design: .monospaced)).foregroundStyle(Color(hex: 0xAAA9BA))
+                        Text(island.week).font(.system(size: 10, design: .monospaced)).foregroundStyle(theme.textSecondary)
                     }
                 }
             }
             Text("\(garden.goodDays) good days · \(islands.flatMap(\.items).filter { $0.kind == .plant }.count) plants")
-                .font(.system(size: 12)).foregroundStyle(Color(hex: 0xAAA9BA))
+                .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
         }
         .padding(24)
-        .background(Color(hex: 0x111827))
+        .background(SceneArt(theme: theme))
     }
 }
 

@@ -19,6 +19,14 @@ public struct ThemeDefinition: Identifiable, Sendable {
 
     public var defaultPalette: Palette { palettes[0] }
     public func palette(_ id: String?) -> Palette? { palettes.first { $0.id == id } }
+
+    /// The palette of the requested mode closest in accent colour to `p` (for "match macOS light/dark").
+    /// Returns `p` itself if it is already in that mode or the theme has none of the other mode.
+    public func counterpart(of p: Palette, dark: Bool) -> Palette {
+        guard p.isDark != dark else { return p }
+        let target = OKLCH(p.accent)
+        return palettes.filter { $0.isDark == dark }.min { OKLCH($0.accent).distance(to: target) < OKLCH($1.accent).distance(to: target) } ?? p
+    }
 }
 
 /// What the user picked. Stored in settings and shared with the widgets.
@@ -31,6 +39,12 @@ public struct ThemeSelection: Codable, Hashable, Sendable {
 
 public enum ThemeCatalog {
     /// Resolves a selection, falling back to the theme's first palette, then to the default theme.
+    /// Resolves a selection for the current system appearance when `matchSystem` is on.
+    public static func resolve(_ s: ThemeSelection, matchSystem: Bool, systemDark: Bool) -> (ThemeDefinition, Palette) {
+        let (t, p) = resolve(s)
+        return (t, matchSystem ? t.counterpart(of: p, dark: systemDark) : p)
+    }
+
     public static func resolve(_ s: ThemeSelection) -> (ThemeDefinition, Palette) {
         let theme = all.first { $0.id == s.themeID } ?? all[0]
         return (theme, theme.palette(s.paletteID) ?? theme.defaultPalette)

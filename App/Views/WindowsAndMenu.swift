@@ -22,7 +22,7 @@ struct InsightsView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Insights").font(.system(size: 26, weight: .bold)).foregroundStyle(theme.pink)
+                Text("Insights").font(.system(size: 26, weight: .bold)).foregroundStyle(theme.accent)
                 if model.insights.isEmpty {
                     Text("Still learning: \(sessions.count) focus sessions so far. Most patterns need 2–4 weeks.")
                         .foregroundStyle(theme.textSecondary)
@@ -37,7 +37,7 @@ struct InsightsView: View {
                 }
                 Text("Focused minutes, last 14 days").font(.headline).foregroundStyle(theme.textPrimary)
                 Chart(bars) { b in
-                    BarMark(x: .value("Day", b.id), y: .value("Minutes", b.minutes)).foregroundStyle(theme.pink).cornerRadius(3)
+                    BarMark(x: .value("Day", b.id), y: .value("Minutes", b.minutes)).foregroundStyle(theme.accent).cornerRadius(3)
                 }
                 .chartYAxisLabel("min").frame(height: 180)
                 Text("Share of sessions interrupted, by start time").font(.headline).foregroundStyle(theme.textPrimary)
@@ -45,7 +45,7 @@ struct InsightsView: View {
                     Text("No sessions yet.").foregroundStyle(theme.textSecondary)
                 } else {
                     Chart(blocks) { b in
-                        BarMark(x: .value("Start", b.id), y: .value("Interrupted", b.rate)).foregroundStyle(theme.lavender).cornerRadius(3)
+                        BarMark(x: .value("Start", b.id), y: .value("Interrupted", b.rate)).foregroundStyle(theme.tagFocus).cornerRadius(3)
                             .annotation(position: .top) { Text("n=\(b.n)").font(.system(size: 9)).foregroundStyle(theme.textSecondary) }
                     }
                     .chartYScale(domain: 0...1)
@@ -57,7 +57,7 @@ struct InsightsView: View {
             .padding(24)
         }
         .frame(minWidth: 560, minHeight: 600)
-        .background(Color(hex: 0x111827))
+        .background(theme.surface)
     }
 }
 
@@ -66,6 +66,14 @@ struct SettingsView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
+        TabView {
+            general.tabItem { Label("General", systemImage: "gearshape") }
+            AppearanceView(settings: settings).tabItem { Label("Appearance", systemImage: "paintpalette") }
+        }
+        .frame(width: 780, height: 660)
+    }
+
+    private var general: some View {
         Form {
             Section("Vault") {
                 TextField("Vault folder", text: $settings.vaultPath)
@@ -89,14 +97,10 @@ struct SettingsView: View {
                 Toggle("Today", isOn: $settings.showToday)
                 Toggle("Focus", isOn: $settings.showFocus)
                 Toggle("Night Garden", isOn: $settings.showProgress)
-                Picker("Theme", selection: $settings.themeMode) {
-                    Text("Night").tag("night"); Text("Day").tag("day"); Text("Follow system").tag("system")
-                }
                 Toggle("Open at login", isOn: $settings.launchAtLogin)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 620)
     }
 }
 
@@ -116,6 +120,16 @@ struct MenuBarContent: View {
         Divider()
         Text("\(model.tasks.filter { $0.status == .done }.count) of \(model.tasks.count) tasks · \(model.todayFocusedMin) min focused")
         Button("Insights…") { openWindow(id: "insights"); NSApp.activate() }
+        Menu("Theme") {
+            ForEach(ThemeCatalog.all) { t in
+                Button { model.selectTheme(t.id) } label: {
+                    Label(t.name, systemImage: t.id == model.settings.themeSelection.themeID ? "checkmark" : "circle")
+                }
+            }
+            Divider()
+            Button("Next colour combo") { model.cyclePalette(1) }
+            Button("Previous colour combo") { model.cyclePalette(-1) }
+        }
         Button("Save garden postcard") { model.savePostcard() }
         Button("Open vault folder") { NSWorkspace.shared.open(model.coordinator.config.appDir) }
         Button("Refresh now") { model.refreshNow() }

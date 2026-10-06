@@ -30,6 +30,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public var timerStart: Date? = nil
     /// Stopwatch only: seconds so far (shown while paused).
     public var elapsedS: Int? = nil
+    /// Theme and colour combo the app is showing, so widgets match it.
+    public var theme: ThemeSelection? = nil
 
     public init(updated: Date, tasks: [Row], doneCount: Int, totalCount: Int, phase: FocusPhase, timerTitle: String,
                 timerEnd: Date?, remainingS: Int, nextTask: Row?, focusedMinutesToday: Int, goodDays: Int) {

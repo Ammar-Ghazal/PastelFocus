@@ -55,6 +55,8 @@ final class AppModel: ObservableObject {
     @Published var todayFocusedMin = 0
     @Published var sessionsToday: [SessionRecord] = []
     @Published var hermesCard: (TaskItem, Int, String?)? = nil
+    /// The theme on screen: the user's choice, matched to macOS light/dark if they asked for that.
+    @Published private(set) var theme = Theme.standard
 
     private var watcher: FileWatcher?
     private var ticker: Timer?
@@ -73,16 +75,61 @@ final class AppModel: ObservableObject {
         notifier.onAction = { [weak self] action, info in self?.handleNotification(action, info: info) }
         if AppSettings.devName == nil { hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) }) }
         observeSystem()
+        applyTheme()
+        settings.$themeSelection.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.applyTheme() } }.store(in: &bag)
+        settings.$ambientMotion.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.objectWillChange.send() } }.store(in: &bag)
+        settings.$matchSystemAppearance.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.applyTheme() } }.store(in: &bag)
+        DistributedNotificationCenter.default().addObserver(forName: .init("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyTheme() }
+        }
         settings.$focusMinutes.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.coordinator.engine.preset = settings.preset; self?.publish() } }.store(in: &bag)
         settings.$logsInVault.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         settings.$vaultPath.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         start()
     }
 
+    // MARK: Theme
+
+    func applyTheme() {
+        let systemDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let (definition, palette) = ThemeCatalog.resolve(settings.themeSelection, matchSystem: settings.matchSystemAppearance,
+                                                         systemDark: systemDark)
+        coordinator.themeSelection = ThemeSelection(themeID: definition.id, paletteID: palette.id)
+        let next = Theme(definition, palette)
+        guard next.palette.id != theme.palette.id else { return }
+        theme = next
+        coordinator.writeNow()
+        publish()
+    }
+
+    func selectTheme(_ id: String) {
+        guard let t = ThemeCatalog.theme(id), id != settings.themeSelection.themeID else { return }
+        // Keep the mood: pick the new theme's palette closest to the current accent and mode.
+        let current = theme.palette
+        let best = t.palettes.min { a, b in
+            (a.isDark == current.isDark ? 0 : 1, OKLCH(a.accent).distance(to: OKLCH(current.accent)))
+                < (b.isDark == current.isDark ? 0 : 1, OKLCH(b.accent).distance(to: OKLCH(current.accent)))
+        } ?? t.defaultPalette
+        settings.themeSelection = ThemeSelection(themeID: id, paletteID: best.id)
+    }
+
+    /// Steps through the current theme's colour combos (menu bar).
+    func cyclePalette(_ step: Int) {
+        let t = ThemeCatalog.resolve(settings.themeSelection).0
+        guard let i = t.palettes.firstIndex(where: { $0.id == settings.themeSelection.paletteID }) else { return }
+        let next = t.palettes[(i + step + t.palettes.count) % t.palettes.count]
+        selectPalette(next.id)
+    }
+
+    func selectPalette(_ id: String) {
+        settings.themeSelection = ThemeSelection(themeID: settings.themeSelection.themeID, paletteID: id)
+    }
+
     func rebuildCoordinator() {
         coordinator.writeNow(appRunning: false)
         coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, widgetDir: settings.widgetDir, preset: settings.preset)
         coordinator.inbox.actions = self
+        coordinator.themeSelection = ThemeSelection(themeID: theme.definition.id, paletteID: theme.palette.id)
         start()
     }
 
@@ -415,7 +462,7 @@ final class AppModel: ObservableObject {
         let islands = garden.islands.filter { island in
             island.items.contains { $0.day.hasPrefix(m) }
         }
-        let view = PostcardView(month: m, islands: islands, garden: garden).environment(\.theme, .night)
+        let view = PostcardView(month: m, islands: islands, garden: garden).environment(\.theme, theme)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
