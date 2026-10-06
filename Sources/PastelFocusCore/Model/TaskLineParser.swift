@@ -1,0 +1,141 @@
+import Foundation
+
+/// Reads and writes task lines in the Obsidian Tasks plugin format, plus the legacy
+/// `**P1 · 90 min** Title — detail` lines that Hermes wrote before PastelFocus.
+public enum TaskLineParser {
+    static let checkbox = try! NSRegularExpression(pattern: #"^(\s*)[-*] \[(.)\] (.*)$"#)
+    static let idField = try! NSRegularExpression(pattern: #"\s*🆔\s*([A-Za-z0-9_-]+)"#)
+    static let dateField = try! NSRegularExpression(pattern: #"\s*(➕|⏳|📅|🛫|✅|❌)\s*(\d{4}-\d{2}-\d{2})"#)
+    static let priorityField = try! NSRegularExpression(pattern: #"\s*(🔺|⏫|🔼|🔽|⏬)️?"#)
+    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions)::\s*(\d+)\s*\]"#)
+    static let legacyMarker = try! NSRegularExpression(pattern: #"\*\*P([123])\s*·\s*([0-9.]+)(?:\s*[–-]\s*([0-9.]+))?\s*(min|h)\*\*\s*"#)
+    static let tagPattern = try! NSRegularExpression(pattern: #"(?<![\w#])#([A-Za-z][\w/-]*)"#)
+
+    /// Minutes in one estimated focus session, used to convert legacy minute estimates.
+    public static let minutesPerSession = 25
+
+    public static func isTaskLine(_ line: String) -> Bool {
+        checkbox.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
+    }
+
+    /// Parses one line. Returns nil when the line is not a checkbox item.
+    public static func parse(_ line: String, file: String = "", lineIndex: Int = 0) -> TaskItem? {
+        let ns = line as NSString
+        guard let m = checkbox.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { return nil }
+        let indent = ns.substring(with: m.range(at: 1))
+        let marker = Character(ns.substring(with: m.range(at: 2)))
+        var text = ns.substring(with: m.range(at: 3))
+
+        var item = TaskItem(status: TaskStatus(marker: marker), description: "", file: file, lineIndex: lineIndex, indent: indent)
+
+        if let id = extract(idField, from: &text).first { item.taskID = id[1] }
+        for match in extract(dateField, from: &text) {
+            switch match[1] {
+            case "➕": item.created = match[2]
+            case "⏳": item.scheduled = match[2]
+            case "📅": item.due = match[2]
+            case "🛫": item.start = match[2]
+            case "✅": item.completed = match[2]
+            case "❌": if item.status == .todo { item.status = .cancelled }
+            default: break
+            }
+        }
+        for match in extract(priorityField, from: &text) {
+            switch match[1] {
+            case "🔺", "⏫": item.priority = .high
+            case "🔼": item.priority = .medium
+            case "🔽", "⏬": item.priority = .low
+            default: break
+            }
+        }
+        for match in extract(inlineField, from: &text) {
+            let value = Int(match[2])
+            if match[1] == "est" { item.estimateSessions = value } else { item.actualSessions = value }
+        }
+
+        let tns = text as NSString
+        if let lm = legacyMarker.firstMatch(in: text, range: NSRange(location: 0, length: tns.length)) {
+            if item.priority == .none {
+                switch tns.substring(with: lm.range(at: 1)) {
+                case "1": item.priority = .high
+                case "2": item.priority = .medium
+                default: item.priority = .low
+                }
+                item.priorityFromLegacy = true
+            }
+            if item.estimateSessions == nil {
+                let low = Double(tns.substring(with: lm.range(at: 2))) ?? 0
+                let high = lm.range(at: 3).location != NSNotFound ? Double(tns.substring(with: lm.range(at: 3))) ?? low : low
+                let unitMinutes = tns.substring(with: lm.range(at: 4)) == "h" ? 60.0 : 1.0
+                let minutes = max(low, high) * unitMinutes
+                item.estimateSessions = max(1, Int((minutes / Double(minutesPerSession)).rounded(.up)))
+            }
+        }
+
+        item.description = collapseSpaces(text)
+        return item
+    }
+
+    /// Canonical line: description, inline fields, then Tasks plugin emoji fields (which must come last).
+    public static func serialize(_ t: TaskItem) -> String {
+        var parts: [String] = [t.description]
+        if let e = t.estimateSessions { parts.append("[est:: \(e)]") }
+        if let s = t.actualSessions { parts.append("[sessions:: \(s)]") }
+        if !t.priorityFromLegacy, let p = t.priority.emoji { parts.append(p) }
+        if let d = t.created { parts.append("➕ \(d)") }
+        if let d = t.start { parts.append("🛫 \(d)") }
+        if let d = t.scheduled { parts.append("⏳ \(d)") }
+        if let d = t.due { parts.append("📅 \(d)") }
+        if let d = t.completed { parts.append("✅ \(d)") }
+        if let id = t.taskID { parts.append("🆔 \(id)") }
+        let body = parts.filter { !$0.isEmpty }.joined(separator: " ")
+        return "\(t.indent)- [\(t.status.rawValue)] \(body)"
+    }
+
+    // MARK: Helpers
+
+    public static func tags(in text: String) -> [String] {
+        let ns = text as NSString
+        return tagPattern.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
+    }
+
+    public static func removingTags(_ text: String) -> String {
+        let ns = text as NSString
+        let stripped = tagPattern.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: ns.length), withTemplate: "")
+        return collapseSpaces(stripped)
+    }
+
+    public static func stripLegacyMarker(_ text: String) -> String {
+        let ns = text as NSString
+        return legacyMarker.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: ns.length), withTemplate: "")
+    }
+
+    static func collapseSpaces(_ s: String) -> String {
+        s.split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Removes every match of `regex` from `text` and returns the capture groups of each match.
+    static func extract(_ regex: NSRegularExpression, from text: inout String) -> [[String]] {
+        let ns = text as NSString
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
+        let groups = matches.map { m in (0..<m.numberOfRanges).map { i -> String in
+            let r = m.range(at: i)
+            return r.location == NSNotFound ? "" : ns.substring(with: r)
+        } }
+        let mutable = NSMutableString(string: text)
+        for m in matches.reversed() { mutable.replaceCharacters(in: m.range, with: " ") }
+        text = mutable as String
+        return groups
+    }
+
+    /// A short random task ID such as `r7q2`.
+    public static func newID<G: RandomNumberGenerator>(using rng: inout G) -> String {
+        let alphabet = Array("abcdefghijkmnpqrstuvwxyz23456789")
+        return String((0..<4).map { _ in alphabet[Int.random(in: 0..<alphabet.count, using: &rng)] })
+    }
+
+    public static func newID() -> String {
+        var g = SystemRandomNumberGenerator()
+        return newID(using: &g)
+    }
+}
