@@ -11,6 +11,8 @@ APP="build/Build/Products/Release/PastelFocus.app"
 [[ -d "$APP" ]] || { echo "Build failed"; exit 1; }
 
 pkill -f "PastelFocus.app/Contents/MacOS/PastelFocus" 2>/dev/null || true
+# Wait for the old copy to exit; otherwise `open` just reactivates it and nothing relaunches.
+for _ in {1..50}; do pgrep -f "PastelFocus.app/Contents/MacOS/PastelFocus$" >/dev/null || break; sleep 0.1; done
 mkdir -p ~/Applications
 rm -rf ~/Applications/PastelFocus.app
 cp -R "$APP" ~/Applications/
