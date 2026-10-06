@@ -85,6 +85,8 @@ struct GlassBackground: View {
             else { VisualEffect().clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous)) }
             RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.glassTint)
             RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(theme.border, lineWidth: 1)
+            // Any empty part of the panel (header, padding, gaps) drags the window.
+            if !snapshot { WindowDragArea() }
         }
     }
 }

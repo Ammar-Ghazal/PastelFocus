@@ -104,6 +104,31 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 final class DesktopPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// A non-activating panel never becomes key on its own, so AppKit swallowed the first click on
+    /// views inside scroll views (checkboxes, menus). Take key status on every mouse-down instead.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown || event.type == .rightMouseDown, !isKeyWindow {
+            makeKey()
+        }
+        super.sendEvent(event)
+    }
+}
+
+/// Hosting view that accepts the click that brings the panel forward.
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// Drag area for borderless panels: SwiftUI content covers the whole window, so
+/// `isMovableByWindowBackground` never sees a background click. Put this behind headers and padding.
+struct WindowDragArea: NSViewRepresentable {
+    final class DragView: NSView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+    func makeNSView(context: Context) -> NSView { DragView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 @MainActor
@@ -121,7 +146,7 @@ final class PanelController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: content())
+        let host = FirstMouseHostingView(rootView: content())
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host
         panel.setFrameAutosaveName("PastelFocus.\(name)")
