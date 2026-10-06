@@ -109,6 +109,42 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertEqual(c.index?.completedSessions(forTask: "r7q2"), 1)
     }
 
+    /// Regression for the mismatch Hermes reported: Now.md said 2 of 9 while the note's summary said 1 of 8.
+    func testNowNoteSummaryAndWidgetAlwaysAgree() throws {
+        c.refresh()
+        try c.nightly() // writes the summary in the morning
+        // During the day: a task is ticked in Obsidian, Hermes adds one, and one is ticked in the panel.
+        let url = config.dailyNote("2026-10-07")
+        write(read(url).replacingOccurrences(of: "- [ ] Legacy line", with: "- [x] Legacy line"), to: url)
+        c.refresh()
+        write(read(config.inbox) + "- [ ] create Add career samples #career\n", to: config.inbox)
+        c.refresh()
+        try c.perform { try $0.setStatus("r7q2", .done, actor: .you) }
+
+        func count(_ text: String) -> String? {
+            text.range(of: #"- Tasks: \d+ of \d+ done"#, options: .regularExpression).map { String(text[$0]) }
+        }
+        let now = count(read(config.now)), note = count(read(url))
+        XCTAssertEqual(now, "- Tasks: 2 of 3 done")
+        XCTAssertEqual(note, now, "the note's summary must match Now.md without waiting for the nightly pass")
+        let w = WidgetBridge.read(from: widgets)
+        XCTAssertEqual("- Tasks: \(w.doneCount) of \(w.totalCount) done", now)
+        XCTAssertEqual(c.todayTotals().done, 2)
+        // Only one summary section, even after many updates.
+        XCTAssertEqual(read(url).components(separatedBy: "## PastelFocus summary").count, 2)
+    }
+
+    func testSummaryIsNotRewrittenWhenNothingChanged() throws {
+        c.refresh()
+        let url = config.dailyNote("2026-10-07")
+        let mtime = { (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date }
+        let before = mtime()
+        Thread.sleep(forTimeInterval: 1.1)
+        c.writeNow()
+        c.refresh()
+        XCTAssertEqual(mtime(), before)
+    }
+
     func testIndexRebuildsFromScratch() throws {
         c.refresh()
         try c.nightly()
