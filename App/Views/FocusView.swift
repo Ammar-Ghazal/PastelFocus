@@ -18,31 +18,36 @@ struct FocusView: View {
                 Spacer()
                 if snapshot { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) } else { menu }
             }
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(clock).font(.system(size: 36, weight: .medium, design: .monospaced)).monospacedDigit()
-                        .foregroundStyle(theme.isNight ? theme.pinkLight : theme.textPrimary)
-                        .contentTransition(.numericText())
-                    Text(label).font(.system(size: 13)).foregroundStyle(theme.textSecondary).lineLimit(1)
+            HStack(alignment: .center, spacing: 18) {
+                TimerDial(minutes: model.settings.focusMinutes, progress: dialProgress, clock: clock,
+                          caption: dialCaption) { model.setFocusMinutes($0) }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textPrimary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 10) {
+                        playButton
+                        if model.phase != .idle {
+                            Button {
+                                if model.phase == .resting { model.stop(reason: nil) }
+                                else { withAnimation(.easeOut(duration: 0.15)) { askingReason = true } }
+                            } label: {
+                                Image(systemName: "stop.fill").font(.system(size: 12)).foregroundStyle(theme.textSecondary)
+                                    .frame(width: 32, height: 32).background(Circle().fill(theme.elevated))
+                            }
+                            .buttonStyle(PressableStyle()).help("Stop (⌥⌘.)")
+                            .transition(.opacity)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        ForEach(0..<4) { i in Circle().fill(i == model.cycleIndex ? theme.pink : theme.track).frame(width: 6, height: 6) }
+                    }
                 }
-                Spacer()
-                if model.phase == .running || model.phase == .paused || model.phase == .resting, hover {
-                    Button { askingReason = model.phase != .resting; if model.phase == .resting { model.stop(reason: nil) } } label: {
-                        Image(systemName: "stop.fill").font(.system(size: 13)).foregroundStyle(theme.textSecondary).frame(width: 30, height: 30)
-                            .background(Circle().fill(theme.elevated))
-                    }.buttonStyle(.plain).help("Stop (⌥⌘.)")
-                }
-                playButton
-            }
-            HStack(spacing: 8) {
-                Spacer()
-                ForEach(0..<4) { i in Circle().fill(i == model.cycleIndex ? theme.pink : theme.track).frame(width: 7, height: 7) }
-                Spacer()
+                Spacer(minLength: 0)
             }
             gardenRow
         }
-        .padding(20)
-        .frame(width: 280, height: 210)
+        .padding(18)
+        .frame(width: 300, height: 230)
         .background(GlassBackground(radius: 18))
         .onHover { hover = $0 }
         .overlay { cards }
@@ -53,6 +58,21 @@ struct FocusView: View {
         return String(format: "%02d:%02d", s / 60, s % 60)
     }
 
+    /// Ring fill while something runs: the share of time left. Nil while idle (the dial is editable).
+    private var dialProgress: Double? {
+        guard model.phase != .idle, model.plannedS > 0 else { return nil }
+        return Double(model.remainingS) / Double(model.plannedS)
+    }
+
+    private var dialCaption: String {
+        switch model.phase {
+        case .idle: return "min"
+        case .running: return "left"
+        case .paused: return "paused"
+        case .resting: return "rest"
+        }
+    }
+
     private var label: String {
         switch model.phase {
         case .idle:
@@ -61,7 +81,7 @@ struct FocusView: View {
             }
             return model.selectedTask?.title ?? "Pick a task"
         case .running: return model.activeTitle ?? "Unassigned"
-        case .paused: return "Paused"
+        case .paused: return model.activeTitle ?? "Unassigned"
         case .resting: return model.activeKind == .nsdr ? "NSDR" : model.activeKind == .longBreak ? "Long rest" : "Short rest"
         }
     }
@@ -98,11 +118,6 @@ struct FocusView: View {
                     }
                 }
                 Button("No task (Unassigned)") { model.selectedTaskID = nil }
-            }
-            Section("Preset") {
-                Picker("Preset", selection: Binding(get: { model.settings.presetName }, set: { model.settings.presetName = $0 })) {
-                    Text("25 / 5").tag("25/5"); Text("50 / 10").tag("50/10"); Text("Custom").tag("custom")
-                }
             }
             Section("Breaks") {
                 Button("Short rest") { model.startRest(kind: .shortBreak) }

@@ -13,9 +13,8 @@ final class AppSettings: ObservableObject {
     @Published var allowHermesStart: Bool { didSet { d.set(allowHermesStart, forKey: "allowHermesStart") } }
     /// Panels sit at desktop level (behind windows) unless this is on.
     @Published var floatPanels: Bool { didSet { d.set(floatPanels, forKey: "floatPanels") } }
-    @Published var presetName: String { didSet { d.set(presetName, forKey: "presetName") } }
-    @Published var customFocus: Int { didSet { d.set(customFocus, forKey: "customFocus") } }
-    @Published var customRest: Int { didSet { d.set(customRest, forKey: "customRest") } }
+    /// Focus length chosen on the dial (5–120 min). Rest scales with it.
+    @Published var focusMinutes: Int { didSet { d.set(focusMinutes, forKey: "focusMinutes") } }
     /// "night", "day" or "system".
     @Published var themeMode: String { didSet { d.set(themeMode, forKey: "themeMode") } }
     /// File path or URL opened when an NSDR break starts. Empty = none.
@@ -32,7 +31,7 @@ final class AppSettings: ObservableObject {
             "vaultPath": FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Obsidian Vault").path,
             "dailyFolder": "Learning Library/Career/Daily Plans",
             "logsInVault": true, "allowHermesStart": false, "floatPanels": false,
-            "presetName": "25/5", "customFocus": 40, "customRest": 8, "themeMode": "night",
+            "focusMinutes": 25, "themeMode": "night",
             "nsdrAudio": "", "launchAtLogin": true, "showToday": true, "showFocus": true, "showProgress": true,
         ])
         vaultPath = d.string(forKey: "vaultPath")!
@@ -40,9 +39,14 @@ final class AppSettings: ObservableObject {
         logsInVault = d.bool(forKey: "logsInVault")
         allowHermesStart = d.bool(forKey: "allowHermesStart")
         floatPanels = d.bool(forKey: "floatPanels")
-        presetName = d.string(forKey: "presetName")!
-        customFocus = d.integer(forKey: "customFocus")
-        customRest = d.integer(forKey: "customRest")
+        // Migrate the old fixed presets.
+        switch d.string(forKey: "presetName") {
+        case "50/10": d.set(50, forKey: "focusMinutes")
+        case "custom": d.set(DialMath.clamp(d.integer(forKey: "customFocus")), forKey: "focusMinutes")
+        default: break
+        }
+        d.removeObject(forKey: "presetName")
+        focusMinutes = DialMath.clamp(d.integer(forKey: "focusMinutes"))
         themeMode = d.string(forKey: "themeMode")!
         nsdrAudio = d.string(forKey: "nsdrAudio")!
         launchAtLogin = d.bool(forKey: "launchAtLogin")
@@ -52,13 +56,7 @@ final class AppSettings: ObservableObject {
         savedReasons = d.stringArray(forKey: "savedReasons") ?? []
     }
 
-    var preset: FocusPreset {
-        switch presetName {
-        case "50/10": return .deep
-        case "custom": return FocusPreset(focusMinutes: customFocus, shortRestMinutes: customRest, longRestMinutes: customRest * 3)
-        default: return .classic
-        }
-    }
+    var preset: FocusPreset { .forFocus(focusMinutes) }
 
     var vaultConfig: VaultConfig {
         VaultConfig(root: URL(fileURLWithPath: vaultPath, isDirectory: true), dailyFolder: dailyFolder, logsInVault: logsInVault)

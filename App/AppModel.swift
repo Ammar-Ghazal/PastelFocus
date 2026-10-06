@@ -56,7 +56,7 @@ final class AppModel: ObservableObject {
         notifier.onAction = { [weak self] action, info in self?.handleNotification(action, info: info) }
         hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) })
         observeSystem()
-        settings.$presetName.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.coordinator.engine.preset = settings.preset; self?.publish() } }.store(in: &bag)
+        settings.$focusMinutes.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.coordinator.engine.preset = settings.preset; self?.publish() } }.store(in: &bag)
         settings.$logsInVault.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         settings.$vaultPath.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         start()
@@ -234,6 +234,13 @@ final class AppModel: ObservableObject {
             scheduleEndNotification()
         } catch { toast = UndoToast(text: "A session is already running", undo: {}) }
         publish()
+    }
+
+    /// Set from the dial. Only stored; the engine picks it up through the settings subscription.
+    func setFocusMinutes(_ m: Int) {
+        let clamped = DialMath.clamp(m)
+        guard clamped != settings.focusMinutes else { return }
+        settings.focusMinutes = clamped
     }
 
     func pause() { try? coordinator.engine.pause(); notifier.cancel(id: "session-end"); coordinator.saveEngine(); coordinator.writeNow(); publish() }
