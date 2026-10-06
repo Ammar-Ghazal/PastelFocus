@@ -138,7 +138,8 @@ final class AppModel: ObservableObject {
         garden = c.garden()
         let all = c.recorder.log.readAll()
         sessionsToday = all.filter { c.calendar.day($0.startedAt) == c.today }
-        todayFocusedMin = sessionsToday.filter { $0.kind == .focus }.reduce(0) { $0 + $1.focusedS } / 60
+        // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
+        todayFocusedMin = c.todayTotals().rollup.focusedS / 60
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
             selectedTaskID = (tasks.first { $0.status.isOpen && $0.priority == .high } ?? tasks.first { $0.status.isOpen })?.taskID
         }

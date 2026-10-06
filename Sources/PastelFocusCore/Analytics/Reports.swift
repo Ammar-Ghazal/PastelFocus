@@ -96,7 +96,7 @@ public enum Reports {
         let r = rollup ?? DailyRollup(day: calendar.day(updated))
         let done = today.filter { $0.status == .done }.count
         lines += ["## Today", "",
-                  "- Tasks: \(done) of \(today.count) done",
+                  "- Tasks: \(done) of \(today.count) done (open tasks planned for today or earlier, plus tasks finished today)",
                   "- Focused: \(minutes(r.focusedS)) in \(r.completed) finished and \(r.interrupted) interrupted sessions",
                   "- Breaks: \(r.breaks) (NSDR \(r.nsdr))", "",
                   "## Open tasks", ""]
