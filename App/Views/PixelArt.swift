@@ -259,18 +259,40 @@ struct AmbientLayer: NSViewRepresentable {
         }
     }
 
-    func makeNSView(context: Context) -> NSView {
-        let v = NSView()
+    func makeNSView(context: Context) -> AmbientView {
+        let v = AmbientView()
         v.wantsLayer = true
+        v.build = build
         return v
     }
 
-    func updateNSView(_ v: NSView, context: Context) {
-        DispatchQueue.main.async { build(in: v) }
+    func updateNSView(_ v: AmbientView, context: Context) {
+        v.build = build
+        v.inputs = "\(fireflies)|\(waterfall)|\(side)"
+    }
+
+    /// Rebuilds the layers only when the inputs or size change. SwiftUI updates the view often, and
+    /// rebuilding every time restarted the animations (fireflies jumped back to their start).
+    final class AmbientView: NSView {
+        var build: ((NSView) -> Void)?
+        var inputs = "" { didSet { rebuildIfNeeded() } }
+        private var built = ""
+
+        override func layout() {
+            super.layout()
+            rebuildIfNeeded()
+        }
+
+        private func rebuildIfNeeded() {
+            let key = "\(inputs)|\(bounds.size)"
+            guard key != built, bounds.width > 0, bounds.height > 0 else { return }
+            built = key
+            build?(self)
+        }
     }
 
     private func build(in v: NSView) {
-        guard let root = v.layer, v.bounds.width > 0 else { return }
+        guard let root = v.layer else { return }
         root.sublayers?.forEach { $0.removeFromSuperlayer() }
         let g = IsoGeometry(side: side, size: v.bounds.size)
         let h = v.bounds.height // layers have y growing upwards; the Canvas grows downwards

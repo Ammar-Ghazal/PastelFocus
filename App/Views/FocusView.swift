@@ -369,8 +369,8 @@ struct ProgressPanelView: View {
                     Text("\(name(next).capitalized) unlocks at \(next.goodDays) good days").font(.system(size: 11)).foregroundStyle(theme.textSecondary)
                         .help("Good days unlock landmarks: path, pond, stone lantern, red bridge, small house, waterfall.")
                 }
-                Button { model.savePostcard() } label: { Image(systemName: "square.and.arrow.down") }
-                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary).help("Save this month's garden as a postcard in the vault")
+                Button { model.savePostcard(period, containing: day) } label: { Image(systemName: "square.and.arrow.down") }
+                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary).help("Save the garden you're viewing as a postcard in the vault")
             }
         }
         .padding(PanelStyle.padding)

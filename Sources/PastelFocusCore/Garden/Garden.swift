@@ -133,8 +133,9 @@ public struct Garden: Sendable, Equatable {
     public static let minSide = 4
     static let maxFill = 0.45
 
-    /// Lays out the period containing `day`. Each item gets a stable spot from its id (as a fraction
-    /// of the plot), so plants keep their relative places as the plot grows.
+    /// Lays out the period containing `day`. Each item has a fixed home, a fraction of the plot taken
+    /// from its id, and goes on the free tile nearest that home. Earlier sessions are placed first, so
+    /// as the plot grows plants stay near the same relative spot instead of being reshuffled.
     public func plot(_ period: GardenPeriod, containing day: String, calendar: DayCalendar) -> GardenPlot {
         let key = period.key(for: day, calendar: calendar)
         let members = items.filter { period.key(for: $0.day, calendar: calendar) == key }
@@ -143,14 +144,31 @@ public struct Garden: Sendable, Equatable {
         var occupied = Set(landmarks.flatMap { $0.tiles(side: side) })
         var placed: [GardenItem] = []
         for var item in members {
-            var rng = SeededRandom(seed: stableHash(item.id))
-            for _ in 0..<400 {
-                let tile = GardenTile(x: Int(Double(rng.next() % 10_000) / 10_000 * Double(side)),
-                                      y: Int(Double(rng.next() % 10_000) / 10_000 * Double(side)))
-                if occupied.insert(tile).inserted { item.x = tile.x; item.y = tile.y; placed.append(item); break }
-            }
+            let home = Self.home(of: item.id)
+            guard let tile = Self.nearestFree(to: (home.u * Double(side), home.v * Double(side)), side: side, occupied: occupied) else { break }
+            occupied.insert(tile)
+            item.x = tile.x; item.y = tile.y
+            placed.append(item)
         }
         return GardenPlot(period: period, key: key, side: side, items: placed, landmarks: landmarks, fireflies: fireflies)
+    }
+
+    /// An item's preferred spot as fractions (0..<1) of the plot's width and depth.
+    public static func home(of id: String) -> (u: Double, v: Double) {
+        var rng = SeededRandom(seed: stableHash(id))
+        return (Double(rng.next() % 1_000_000) / 1_000_000, Double(rng.next() % 1_000_000) / 1_000_000)
+    }
+
+    /// Free tile whose centre is closest to `target` (in tile units); ties go to the lowest y, then x.
+    static func nearestFree(to target: (Double, Double), side: Int, occupied: Set<GardenTile>) -> GardenTile? {
+        var best: (GardenTile, Double)?
+        for y in 0..<side { for x in 0..<side {
+            let t = GardenTile(x: x, y: y)
+            guard !occupied.contains(t) else { continue }
+            let d = pow(Double(x) + 0.5 - target.0, 2) + pow(Double(y) + 0.5 - target.1, 2)
+            if best == nil || d < best!.1 { best = (t, d) }
+        } }
+        return best?.0
     }
 
     static func side(items: Int, landmarks: [Landmark]) -> Int {

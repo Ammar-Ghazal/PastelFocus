@@ -68,6 +68,25 @@ final class GardenTests: XCTestCase {
         XCTAssertEqual(plot(80, .day).items.count, 3, "a day shows only that day's sessions")
     }
 
+    /// As the plot grows (more sessions, landmarks unlocking), earlier plants stay near the same
+    /// relative spot rather than being reshuffled.
+    func testPlantsKeepTheirRelativeSpotAsThePlotGrows() {
+        let early = (0..<6).map { focus("e\($0)", day: 1 + $0) }
+        let later = (0..<60).map { focus("l\($0)", day: 8 + $0 % 20) }
+        let small = GardenBuilder.build(sessions: early, events: [], calendar: dubai, now: now).plot(.month, containing: "2026-10-15", calendar: dubai)
+        let big = GardenBuilder.build(sessions: early + later, events: [], calendar: dubai, now: now).plot(.month, containing: "2026-10-15", calendar: dubai)
+        XCTAssertGreaterThan(big.side, small.side)
+        func spot(_ p: GardenPlot, _ id: String) -> (Double, Double) {
+            let i = p.items.first { $0.id == id }!
+            return ((Double(i.x) + 0.5) / Double(p.side), (Double(i.y) + 0.5) / Double(p.side))
+        }
+        for e in early {
+            let a = spot(small, e.id), b = spot(big, e.id)
+            // Within one small-plot tile of where it was (fractions of the plot).
+            XCTAssertLessThanOrEqual(hypot(a.0 - b.0, a.1 - b.1), 1.0 / Double(small.side) + 0.01, e.id)
+        }
+    }
+
     func testPeriodKeysAndShifts() {
         XCTAssertEqual(GardenPeriod.week.key(for: "2026-10-07", calendar: dubai), "2026-W41")
         XCTAssertEqual(GardenPeriod.month.key(for: "2026-10-07", calendar: dubai), "2026-10")
