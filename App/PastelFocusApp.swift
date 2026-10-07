@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else { panels.hide("today") }
         if settings.showFocus {
-            panels.show("focus", size: CGSize(width: 300, height: 230), origin: CGPoint(x: screen.maxX - 340, y: screen.maxY - 520), floating: settings.floatPanels) {
+            panels.show("focus", size: CGSize(width: 300, height: 200), origin: CGPoint(x: screen.maxX - 340, y: screen.maxY - 520), floating: settings.floatPanels) {
                 Themed { FocusView() }.environmentObject(model).environmentObject(model.ticks)
             }
         } else { panels.hide("focus") }
