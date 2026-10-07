@@ -44,7 +44,6 @@ final class AppModel: ObservableObject {
     @Published var activeTitle: String?
     @Published var activeKind: SessionKind?
     @Published var selectedTaskID: String?
-    @Published var cycleIndex = 0
     @Published var suggestion: Suggestion?
     @Published var lastEnded: SessionRecord?
     @Published var garden: Garden = .empty
@@ -173,7 +172,6 @@ final class AppModel: ObservableObject {
         elapsedS = c.engine.elapsedS
         isStopwatch = c.engine.isStopwatch
         activeKind = c.engine.active?.kind
-        cycleIndex = c.engine.cycleIndex
         insights = c.insights
         garden = c.garden()
         // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
