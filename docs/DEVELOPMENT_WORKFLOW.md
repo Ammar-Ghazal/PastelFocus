@@ -23,7 +23,7 @@ During AI-assisted development, use the terminal build and launch process in sec
 
 ## 2. Current foundation and the first improvements
 
-The project already separates `PastelFocusCore` from SwiftUI/AppKit, uses `MenuBarExtra` and `LSUIElement`, persists timer state, watches vault changes, and shares snapshots with WidgetKit. Preserve these boundaries.
+The project already separates `PastelFocusCore` from SwiftUI/AppKit, uses `MenuBarExtra` and `LSUIElement`, persists timer state, and watches vault changes. Preserve these boundaries.
 
 On 7 October 2026, all **86 core unit/integration tests passed** using the installed Xcode 27.0 / Swift 6.4 toolchain. This run did not validate GUI behavior, a signed archive, or App Store acceptance. The package and app currently compile in Swift 5 language mode; a newer compiler does not mean Swift 6 strict concurrency is enabled.
 
@@ -33,14 +33,14 @@ Address these items before relying on the release process:
 | --- | --- | --- |
 | First | The install script suppresses build failure with `|| true`; an older build directory can still exist | Preserve the real build exit status, retain the previous installed app until success, and quit the intended instance gracefully before replacement |
 | First | `PASTELFOCUS_DEV` separates some settings and support files, but the default vault is still the real vault | Require a fixture vault before model initialization; isolate every writable path and side effect |
-| Before store beta | The main app lacks the sandbox entitlement; the widget has it | Enable and exercise the main app sandbox; implement user-selected folder access and persistent security-scoped bookmarks |
+| Before store beta | The app lacks the sandbox entitlement | Enable and exercise the main app sandbox; implement user-selected folder access and persistent security-scoped bookmarks |
 | Before store beta | Login-at-launch defaults to enabled and registration happens at startup | Make launch at login an explicit opt-in that applies immediately; reflect actual service status and registration errors |
 | Before store beta | Vault paths and some product text are personal defaults | Add first-run setup, folder selection, neutral defaults, and a useful experience without Hermes or Obsidian installed |
-| Before store beta | Version/build values are duplicated in project settings and both plists | Use one version source and keep app and widget version/build values aligned |
+| Before store beta | Version/build values are duplicated in project settings and the Info.plist | Use one version source |
 | Before public release | No GitHub Actions workflow or app UI-test target is tracked | Add the CI checks below and a few high-value UI smoke tests |
 | Before public release | Store assets and privacy documentation need preparation | Add a proper app icon, product screenshots, support/privacy pages, and accurate privacy declarations |
 
-Development isolation needs more than a settings suite. `AppModel.lastNightlyDay` uses standard defaults, notification setup is unconditional, and the default private-log directory can still point to production storage. A dedicated development bundle identifier, fixture vault, support directory, notification namespace, and optional development App Group should isolate those too. Development hot keys and login registration are already disabled.
+Development isolation needs more than a settings suite. `AppModel.lastNightlyDay` uses standard defaults, notification setup is unconditional, and the default private-log directory can still point to production storage. A dedicated development bundle identifier, fixture vault, support directory, and notification namespace should isolate those too. Development hot keys and login registration are already disabled.
 
 Until that isolation is complete, use a separate macOS test account and a disposable vault for app-level testing. Do not treat `PASTELFOCUS_DEV` alone as protection for the real vault. The existing snapshot-rendering path initializes the model before rendering, so it needs the same precautions.
 
@@ -99,16 +99,16 @@ The repository provides a command-line build route in `scripts/install.sh`. It r
 
 | Tool/input | Role in PastelFocus |
 | --- | --- |
-| `project.yml` | Tracked specification for the macOS app, widget, dependencies, and signing configuration |
+| `project.yml` | Tracked specification for the macOS app, dependencies, and signing configuration |
 | `xcodegen generate` | Generates `PastelFocus.xcodeproj` from the specification |
 | `swift test` | Builds and tests `PastelFocusCore`, the library declared in `Package.swift` |
-| `xcodebuild` | Builds the macOS app bundle and embedded widget using Xcode's compiler, SDKs, and signing tools |
+| `xcodebuild` | Builds the macOS app bundle using Xcode's compiler, SDKs, and signing tools |
 | `open <path-to-app>` | Launches the built app through macOS |
 | App executable + `--render-snapshots` | Uses this project's rendering mode to produce panel/theme PNGs |
 
 `swift build` or `swift test` alone does not package the menu bar app: this package has no app executable target. XcodeGen generates project configuration; `xcodebuild` performs the actual native app build. See [XcodeGen's usage documentation](https://github.com/yonaskolb/XcodeGen#usage) and [Apple's command-line build guide](https://developer.apple.com/library/archive/technotes/tn2339/_index.html).
 
-**The full Xcode installation is still required, even while its window is closed.** The standalone Command Line Tools package does not include `xcodebuild`. Complete initial toolchain setup and select the intended Xcode installation. Signed builds also need the appropriate certificates/private keys, provisioning, registered App Group, and credentials. See [Apple's tool installation guidance](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools/).
+**The full Xcode installation is still required, even while its window is closed.** The standalone Command Line Tools package does not include `xcodebuild`. Complete initial toolchain setup and select the intended Xcode installation. Signed builds also need the appropriate certificates/private keys, provisioning, and credentials. See [Apple's tool installation guidance](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools/).
 
 Check the environment before assigning build work:
 
@@ -122,7 +122,7 @@ xcodegen --version
 
 On 7 October 2026, this Mac selected `/Applications/Xcode.app/Contents/Developer` and reported Xcode 27.0, Swift 6.4, and XcodeGen 2.46.0. Keep these checks in the assistant's build report when investigating toolchain differences.
 
-The assistant needs a Mac execution environment for SwiftUI/AppKit/WidgetKit builds. A cloud session that only edits GitHub files should hand its commit to your local Mac or a macOS CI runner for native verification. It should report native builds as unverified until that execution happens.
+The assistant needs a Mac execution environment for SwiftUI/AppKit builds. A cloud session that only edits GitHub files should hand its commit to your local Mac or a macOS CI runner for native verification. It should report native builds as unverified until that execution happens.
 
 ### Branch, test, and build
 
@@ -141,9 +141,9 @@ xcodebuild -project PastelFocus.xcodeproj \
   -destination 'platform=macOS' -derivedDataPath build build
 ```
 
-These are separate commands; continue only when each required step succeeds. The Debug app is produced at `build/Build/Products/Debug/PastelFocus.app`. The signed app build needs your local signing configuration for the App Group. The installer adds `-allowProvisioningUpdates`, which permits Xcode to update provisioning using configured credentials; use that option deliberately when needed.
+These are separate commands; continue only when each required step succeeds. The Debug app is produced at `build/Build/Products/Debug/PastelFocus.app`. The signed app build needs your local signing configuration. The installer adds `-allowProvisioningUpdates`, which permits Xcode to update provisioning using configured credentials; use that option deliberately when needed.
 
-For a compilation check without signing credentials, add `CODE_SIGNING_ALLOWED=NO` to the build command. Do not use an unsigned build as evidence that App Groups, widgets, notifications, login items, or distribution signing work.
+For a compilation check without signing credentials, add `CODE_SIGNING_ALLOWED=NO` to the build command. Do not use an unsigned build as evidence that notifications, login items, or distribution signing work.
 
 XcodeGen's `project.yml` is the project source of truth; the generated `.xcodeproj` is ignored, so persistent target/capability changes belong in `project.yml` and the tracked source/configuration. Assistants can edit these files directly; they do not need Xcode's project editor.
 
@@ -154,9 +154,9 @@ Use the checks that fit the change:
 | Change | Required evidence before merge |
 | --- | --- |
 | Core logic, vault writes, timer state | Relevant regression tests plus the complete fast core suite |
-| SwiftUI/AppKit or shared rendering | App/widget build plus actual interaction check; core suite if shared logic changed |
+| SwiftUI/AppKit or shared rendering | App build plus actual interaction check; core suite if shared logic changed |
 | Theme tokens | Palette/contrast tests plus representative light/dark rendering |
-| Signing, entitlements, App Groups, login, or notifications | A signed installed build and the relevant permission/lifecycle checks |
+| Signing, entitlements, login, or notifications | A signed installed build and the relevant permission/lifecycle checks |
 | State or schema migration | Old-version fixture upgrade, interrupted/repeated migration, and failure recovery |
 | Documentation only | Check links, commands, and consistency |
 
@@ -184,7 +184,7 @@ PASTELFOCUS_DEV=ui ./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/P
   --render-snapshots /private/tmp/PastelFocus-ui-snapshots
 ```
 
-Inspect the generated PNGs; the rendering code can suppress file errors, so an exit code alone is insufficient. This mode needs a logged-in graphical Mac session and initializes the model before rendering. It checks appearance, not mouse hit areas, window focus, notification permissions, or shipping widget behavior. Development mode disables widgets; validate those separately with a signed, production-equivalent build.
+Inspect the generated PNGs; the rendering code can suppress file errors, so an exit code alone is insufficient. This mode needs a logged-in graphical Mac session and initializes the model before rendering. It checks appearance, not mouse hit areas, window focus, or notification permissions.
 
 The routine manual check takes about 5–10 minutes: menu opens; Settings/Insights appear; panel controls work on their first click; dial drags and keyboard adjustment work; start/pause/resume/stop work; a task edit reaches the fixture vault; external edits reach the app; a theme change updates visible panels; Quit exits cleanly; a relaunch restores expected state.
 
@@ -203,7 +203,7 @@ Add a GitHub Actions workflow for PRs and pushes to `main` using a macOS runner 
 Required jobs:
 
 1. **Core tests:** `swift test`.
-2. **Native build:** generate the project, then compile the app and embedded widget in Debug and Release. An unsigned compilation can use `CODE_SIGNING_ALLOWED=NO`; it proves compilation, not entitlement or distribution correctness.
+2. **Native build:** generate the project, then compile the app in Debug and Release. An unsigned compilation can use `CODE_SIGNING_ALLOWED=NO`; it proves compilation, not entitlement or distribution correctness.
 3. **Configuration checks:** validate plists and version alignment. Add targeted checks for capabilities/manifest resources when those are established.
 
 Use stable check names and run every required check on each PR. Retain logs and useful build/test reports on failure. Formatting/lint checks are useful once configured, but should not create large unrelated rewrites.
@@ -223,7 +223,6 @@ Keep signed archives/uploads in a separate, deliberately triggered terminal rele
 - **Use public system APIs and least privilege.** Keep `MenuBarExtra` unless you need behavior it cannot provide; use AppKit for justified panel behavior. Keep `SMAppService` for login management and display its actual status. Handle shortcut collisions and registration failures.
 - **Design permissions into the feature.** Ask for notifications at a useful moment, handle refusal, and keep timers usable without alerts. A denied vault permission should offer folder reselection rather than silently showing an empty task list.
 - **Protect data and expose failures.** Preserve unknown Markdown, surface failed saves, and keep logs recoverable. Atomic replacement and a pre-write signature check do not by themselves prove cross-process lost-update protection; stress-test concurrent Obsidian/Hermes/app writes and use coordination or conflict preservation where needed.
-- **Make widgets eventually consistent.** Keep atomic snapshots in the entitled App Group. Deduplicate commands, handle the app being closed, and accept that WidgetKit schedules refreshes; do not promise real-time widget updates.
 - **Support accessibility.** Give controls labels, keyboard access, visible focus, and usable click targets. Check VoiceOver, Increase Contrast, Reduce Transparency, and Reduce Motion.
 - **Log useful diagnostics.** Use structured unified logging for permission, file, timer, and migration failures without exposing task text or private paths. Include app version/build in an About or diagnostics view.
 
@@ -231,7 +230,7 @@ See [MenuBarExtra](https://developer.apple.com/documentation/swiftui/menubarextr
 
 ## 7. The checks before a release candidate
 
-Use a **Release build installed normally**, with production-equivalent sandboxing, signing, App Groups, and permissions. A development build with widgets disabled cannot validate shipping widget behavior.
+Use a **Release build installed normally**, with production-equivalent sandboxing, signing, and permissions.
 
 | Area | Check |
 | --- | --- |
@@ -242,7 +241,6 @@ Use a **Release build installed normally**, with production-equivalent sandboxin
 | Vault integrity | Simultaneous external edits, duplicate IDs, malformed/truncated records, read-only files, save errors, large fixture vault |
 | UI | First click, dial hit area, keyboard navigation, dragging, multiple monitors, display disconnect, Spaces/fullscreen |
 | Appearance | Representative palettes for every theme, light/dark matching, accessibility settings, hidden-panel motion |
-| Widgets | Add/remove each widget, commands with app open/closed, snapshot recovery, stale state, correct App Group access |
 | Login and shortcuts | Explicit opt-in/out, system-disabled login service, error state, shortcut collision |
 | Upgrade | Previous released data/preferences/state into candidate; sandbox-container migration; failed and repeated migrations |
 | Performance | Idle, active timer, animated themes, hidden panels, file-change burst, and a long-running session |
@@ -272,7 +270,7 @@ A candidate is ready when:
 - Its exact commit passes CI, independent review, and acceptance checks.
 - No known data-loss, security, launch, or core-workflow blocker remains.
 - Clean installation and upgrade preserve data and settings.
-- The signed beta works with real permissions, login behavior, and widgets.
+- The signed beta works with real permissions and login behavior.
 - Performance is acceptable against the recorded baseline.
 - Store metadata, privacy/support links, review notes, and release notes match the build.
 
@@ -282,11 +280,11 @@ Do not wait for every feature on the roadmap. Choose a small public promise and 
 
 Use a simple version policy: `1.0.1` for fixes, `1.1.0` for compatible features, and `2.0.0` for a deliberately substantial or incompatible change. A major version number does not replace a data migration.
 
-Use an increasing integer build number for each upload. One public version may have several beta builds. Drive `CFBundleShortVersionString` and `CFBundleVersion` from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the generated configuration; verify that both app and widget resolve to the intended values.
+Use an increasing integer build number for each upload. One public version may have several beta builds. Drive `CFBundleShortVersionString` and `CFBundleVersion` from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the generated configuration; verify that the app resolves to the intended values.
 
 Before the first store beta:
 
-1. Configure the Apple Developer account, bundle identifiers, App Group, signing, and App Store Connect app record.
+1. Configure the Apple Developer account, bundle identifier, signing, and App Store Connect app record.
 2. Enable the main app sandbox. Replace a typed vault path as the authorization mechanism with a system folder picker, read/write user-selected access, and persistent security-scoped bookmarks. Resolve/refresh stale bookmarks and balance access calls. Plan migration of existing private support data into sandbox-managed storage. See [Apple's sandbox file-access guidance](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox).
 3. Prepare the app icon, screenshots, description, support contact, privacy policy, age rating, and applicable export-compliance answers. Link the privacy policy in App Store Connect and inside the app, as required by [App Review Guidelines, section 5.1.1](https://developer.apple.com/app-store/review/guidelines/#data-collection-and-storage).
 4. Audit actual data handling, including dependencies and optional external-agent integration. On-device processing alone is not considered collection for the privacy label; sending data elsewhere can change the answers. See [App privacy details](https://developer.apple.com/app-store/app-privacy-details/).
@@ -296,10 +294,10 @@ Before the first store beta:
 For each candidate:
 
 1. Freeze a tested commit and set version/build values. Avoid merging new features into that candidate.
-2. Create a Release archive using `xcodebuild archive` or Xcode Organizer, then export/validate it with the appropriate production distribution configuration. Check the resolved entitlements, embedded widget, versions, architectures, resources, and absence of development overrides.
+2. Create a Release archive using `xcodebuild archive` or Xcode Organizer, then export/validate it with the appropriate production distribution configuration. Check the resolved entitlements, versions, architectures, resources, and absence of development overrides.
 3. Upload to App Store Connect and test that processed build through TestFlight. External testing can require beta review; builds expire after 90 days. See [TestFlight overview](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/).
 4. If fixes are needed, create a new build number and repeat the affected checks. Select the same tested App Store Connect build for submission.
-5. Provide review notes explaining that the app lives in the menu bar, how to open Settings, how to choose/create a sample vault, and how to use the timer/widgets. Make the core feature testable without private notes or Hermes access.
+5. Provide review notes explaining that the app lives in the menu bar, how to open Settings, how to choose/create a sample vault, and how to use the timer. Make the core feature testable without private notes or Hermes access.
 6. Submit for review with manual release control. After approval, release when you can monitor feedback and address problems.
 7. Tag the released source commit, for example `v1.0.0`, and record its build number, commit, toolchain, and release notes. Preserve the signed archive and dSYMs outside Git.
 

@@ -1,13 +1,13 @@
 import Foundation
 
-/// Every colour the app and widgets use. One palette = one complete, coordinated colour combo.
+/// Every colour the app uses. One palette = one complete, coordinated colour combo.
 public struct Palette: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var name: String
     public var isDark: Bool
 
     // Surfaces
-    public var surface: RGBA        // opaque panel/widget base
+    public var surface: RGBA        // opaque panel base
     public var glass: RGBA          // translucent tint laid over the blur and scene
     public var elevated: RGBA       // pills, buttons, menus
     public var highlight: RGBA      // highlighted task row

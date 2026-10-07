@@ -4,7 +4,7 @@ import PastelFocusCore
 /// User settings in UserDefaults. Defaults follow the spec's section 9 recommendations.
 final class AppSettings: ObservableObject {
     /// Development only: `PASTELFOCUS_DEV=<name>` runs a fully separate instance (own settings suite,
-    /// support folder, no widgets) so it can't disturb the installed app's timer or settings.
+    /// support folder, no login item or hot keys) so it can't disturb the installed app's timer or settings.
     static let devName = ProcessInfo.processInfo.environment["PASTELFOCUS_DEV"]
     private let d = devName.flatMap { UserDefaults(suiteName: "com.ammarghazal.pastelfocus.dev.\($0)") } ?? .standard
 
@@ -12,7 +12,6 @@ final class AppSettings: ObservableObject {
         AppSettings.devName.map { FileManager.default.temporaryDirectory.appendingPathComponent("PastelFocus-dev-\($0)") }
             ?? VaultConfig.defaultSupportDirectory
     }
-    var widgetDir: URL? { AppSettings.devName == nil ? WidgetBridge.container : nil }
 
     @Published var vaultPath: String { didSet { d.set(vaultPath, forKey: "vaultPath") } }
     @Published var dailyFolder: String { didSet { d.set(dailyFolder, forKey: "dailyFolder") } }

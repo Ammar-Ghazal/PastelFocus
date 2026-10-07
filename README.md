@@ -17,12 +17,12 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 │  PastelFocusCore (Swift package, no UI, fully unit-tested)                     │
 │   Coordinator ─ TaskStore ─ InboxProcessor ─ FocusEngine ─ SessionRecorder     │
 │               ─ AnalyticsEngine ─ SuggestionEngine ─ GardenBuilder ─ Reports   │
-│               ─ IndexDatabase (private SQLite cache) ─ WidgetBridge            │
-└───────┬──────────────────────────────────────────────────┬────────────────────┘
-        │ FSEvents watch + safe line edits                  │ snapshot.json / widget-commands.jsonl
-        ▼                                                   ▼
-  Obsidian vault (source of truth)                    App Group container
-  ├─ Learning Library/Career/Daily Plans/*.md          └─ WidgetKit extension (Today, Focus, Progress)
+│               ─ IndexDatabase (private SQLite cache)                           │
+└───────┬────────────────────────────────────────────────────────────────────────┘
+        │ FSEvents watch + safe line edits
+        ▼
+  Obsidian vault (source of truth)
+  ├─ Learning Library/Career/Daily Plans/*.md
   └─ PastelFocus/ Inbox.md Now.md Insights.md
                   Backlog.md Problems.md Stats/ Logs/ Garden/
         ▲
@@ -41,7 +41,6 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 | Timer tick | Every second while a session runs; time is computed from the clock, so sleep/App Nap/restarts are safe |
 | Nightly pass (insights, Stats, daily summary, index) | First wake after midnight and 21:00 |
 | Garden animation | Core Animation layers (render server), no per-frame app work |
-| Widgets | Drawn by macOS from the snapshot the app writes |
 
 ## Vault files
 
@@ -103,13 +102,13 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 **How palettes are made (`Sources/PastelFocusCore/Theme`).** Each combo is a one-line spec — mode, background hue, accent hue, vibrance, tag hues. `PaletteBuilder` derives all 25 tokens in OKLCH (perceptual lightness/chroma, gamut-mapped to sRGB), then enforces WCAG contrast: primary text ≥ 7:1, secondary ≥ 4.5:1, tags ≥ 4.5:1, and text on accent fills ≥ 4.5:1 (dark or light text, whichever reads better). `ThemeTests` checks every palette for these, for in-gamut colours, unique IDs, and tag colours that stay distinguishable. The original Midnight Blossom palette is kept exactly.
 
-**Where it renders.** `Shared/ThemeKit.swift` (tokens → SwiftUI) and `Shared/SceneArt.swift` (static scene art, drawn once with `Canvas`) are compiled into both the app and the widget extension, so widgets show the same scene and colours; the widget snapshot carries the active theme. The app adds `AmbientScene` — Core Animation layers and particle emitters (0% app CPU). *Ambient motion* and macOS Reduce Motion switch it off. *Match macOS light/dark* swaps to the theme's closest combo of the other mode.
+**Where it renders.** `App/Theme/ThemeKit.swift` (tokens → SwiftUI) and `App/Theme/SceneArt.swift` (static scene art, drawn once with `Canvas`). On top of that the app adds `AmbientScene` — Core Animation layers and particle emitters (0% app CPU). *Ambient motion* and macOS Reduce Motion switch it off. *Match macOS light/dark* swaps to the theme's closest combo of the other mode.
 
 ## Performance notes
 
 - Per-second timer values live in `TickState`, observed only by the Focus panel and menu-bar label, so the Today list doesn't redraw every second.
 - Looping animations (garden fireflies, play-button glow) are Core Animation layers that run in the render server; the dial ring eases only when you change it, not on every tick.
-- Log files are cached per file and re-parsed only when their size or date changes; widgets reload only when their snapshot changes; generated files are written only when their content changes.
+- Log files are cached per file and re-parsed only when their size or date changes; generated files are written only when their content changes.
 
 ## Night Garden
 
@@ -117,10 +116,10 @@ Each finished focus session plants a pixel sprite (species by category, size by 
 
 ## Build, test, install
 
-Xcode's window can stay closed: XcodeGen generates the project from `project.yml`, and `xcodebuild` builds the native macOS app and widget using the installed Xcode tools. Full Xcode is required. See the [terminal development workflow](docs/DEVELOPMENT_WORKFLOW.md#4-the-daily-terminal-build-test-and-fix-loop) for setup, isolated launches, screenshots, and release archives.
+Xcode's window can stay closed: XcodeGen generates the project from `project.yml`, and `xcodebuild` builds the native macOS app using the installed Xcode tools. Full Xcode is required. See the [terminal development workflow](docs/DEVELOPMENT_WORKFLOW.md#4-the-daily-terminal-build-test-and-fix-loop) for setup, isolated launches, screenshots, and release archives.
 
 ```bash
-swift test                      # 86 unit/integration tests for PastelFocusCore; does not package the app
+swift test                      # 85 unit/integration tests for PastelFocusCore; does not package the app
 xcodegen generate
 xcodebuild -project PastelFocus.xcodeproj -scheme PastelFocus -configuration Debug \
   -destination 'platform=macOS' -derivedDataPath build build
@@ -128,9 +127,9 @@ xcodebuild -project PastelFocus.xcodeproj -scheme PastelFocus -configuration Deb
 
 The existing `./scripts/install.sh` builds Release, installs to `~/Applications`, and relaunches. Its error handling needs correction before relying on it: a suppressed build failure can leave an older app available for installation.
 
-`PASTELFOCUS_DEV=<name>` uses a separate settings suite and temporary support folder, and disables widgets, login registration, and hot keys. It still defaults to the real vault and shares some state. Use the workflow's separate test account and fixture-vault setup before launching development copies or rendering snapshots.
+`PASTELFOCUS_DEV=<name>` uses a separate settings suite and temporary support folder, and disables login registration and hot keys. It still defaults to the real vault and shares some state. Use the workflow's separate test account and fixture-vault setup before launching development copies or rendering snapshots.
 
-Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXRF` (signing + App Group `58FZ49BXRF.com.ammarghazal.pastelfocus` for widgets).
+Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXRF` for signing.
 
 | Test file | Covers |
 | --- | --- |
@@ -146,7 +145,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `StopwatchTests` | Count up, stop = completed, pauses, 4 h cap, old state loads, analytics |
 | `LogCacheTests` | Cache hits, appends and outside edits invalidate |
 | `ThemeTests` | 12 themes × 21 palettes: contrast, gamut, unique IDs, distinguishable tags, light/dark matching |
-| `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, widget taps, nightly files, index rebuild |
+| `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, nightly files, index rebuild |
 
 ## Settings (menu bar → Settings…)
 
@@ -155,9 +154,8 @@ Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes 
 ## Code map
 
 ```
-Sources/PastelFocusCore/   Model/ Vault/ Inbox/ Timer/ Analytics/ Suggestions/ Garden/ Index/ Widgets/ Coordinator.swift
-App/                       PastelFocusApp.swift, AppModel.swift, Support/ (theme, settings, system services), Views/
-Widgets/                   WidgetKit bundle + App Intents
+Sources/PastelFocusCore/   Model/ Vault/ Inbox/ Timer/ Analytics/ Suggestions/ Garden/ Index/ Coordinator.swift
+App/                       PastelFocusApp.swift, AppModel.swift, Support/ (panel styling, settings, system services), Theme/ (tokens, scene art), Views/
 Tests/PastelFocusCoreTests/
-project.yml                XcodeGen project (app + widget extension)
+project.yml                XcodeGen project
 ```

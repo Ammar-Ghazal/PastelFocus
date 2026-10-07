@@ -1,8 +1,6 @@
 import PastelFocusCore
 import SwiftUI
 
-// Compiled into both the app and the widget extension, so widgets render the same theme.
-
 extension Color {
     init(_ c: RGBA) { self.init(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: c.a) }
 
@@ -90,7 +88,7 @@ extension EnvironmentValues {
         get { self[ThemeKey.self] }
         set { self[ThemeKey.self] = newValue }
     }
-    /// True when rendering offscreen PNGs (and in widgets), where AppKit-backed views can't be drawn.
+    /// True when rendering offscreen PNGs, where AppKit-backed views can't be drawn.
     var snapshotMode: Bool {
         get { self[SnapshotKey.self] }
         set { self[SnapshotKey.self] = newValue }

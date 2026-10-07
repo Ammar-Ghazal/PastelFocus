@@ -1,6 +1,6 @@
 import Foundation
 
-/// Platform-neutral sRGB colour (0...1 components). Used by the core, the app and the widgets.
+/// Platform-neutral sRGB colour (0...1 components). Used by the core and the app.
 public struct RGBA: Codable, Hashable, Sendable {
     public var r: Double
     public var g: Double

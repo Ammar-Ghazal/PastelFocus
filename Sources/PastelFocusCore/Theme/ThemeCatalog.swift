@@ -1,6 +1,6 @@
 import Foundation
 
-/// Backdrop art + ambient motion. Drawn by the app (animated) and widgets (static).
+/// Backdrop art + ambient motion. Drawn by the app: static art plus animated ambient layers.
 public enum SceneKind: String, Codable, Sendable, CaseIterable {
     case pastelRetro, deepSpace, enchantedForest, oceanDepths, synthwave, zenPaper
     case cozyAutumn, aurora, desertDusk, sakura, terminal, winter
@@ -29,7 +29,7 @@ public struct ThemeDefinition: Identifiable, Sendable {
     }
 }
 
-/// What the user picked. Stored in settings and shared with the widgets.
+/// What the user picked. Stored in settings.
 public struct ThemeSelection: Codable, Hashable, Sendable {
     public var themeID: String
     public var paletteID: String

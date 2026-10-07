@@ -6,16 +6,14 @@ final class CoordinatorTests: XCTestCase {
     var config: VaultConfig!
     var clock: FixedClock!
     var support: URL!
-    var widgets: URL!
     var c: Coordinator!
 
     override func setUp() {
         config = makeVault()
         clock = FixedClock("2026-10-07T05:00:00Z")
         support = config.root.appendingPathComponent(".support")
-        widgets = config.root.appendingPathComponent(".group")
         write("## Today's task list\n\n- [ ] Finalize resume #career ⏫ [est:: 2] 🆔 r7q2\n- [ ] Legacy line\n", to: config.dailyNote("2026-10-07"))
-        c = Coordinator(config: config, calendar: dubai, clock: clock, supportDir: support, widgetDir: widgets)
+        c = Coordinator(config: config, calendar: dubai, clock: clock, supportDir: support)
     }
 
     func testFirstRefreshStampsIDsAndWritesGeneratedFiles() {
@@ -25,20 +23,17 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertTrue(c.todayTasks.allSatisfy { $0.taskID != nil })
         XCTAssertTrue(read(config.now).contains("- Tasks: 0 of 2 done"))
         XCTAssertTrue(read(config.inbox).hasPrefix("# PastelFocus Inbox"))
-        XCTAssertEqual(WidgetBridge.read(from: widgets).totalCount, 2)
     }
 
     /// Regression: rewriting unchanged files woke the app's own file watcher in a loop (~20% CPU).
     func testRefreshDoesNotRewriteUnchangedFiles() throws {
         c.refresh()
         let mtime = { (try? FileManager.default.attributesOfItem(atPath: self.config.now.path)[.modificationDate]) as? Date }
-        let snapshotTime = { (try? FileManager.default.attributesOfItem(atPath: WidgetBridge.snapshotURL(in: self.widgets).path)[.modificationDate]) as? Date }
-        let before = mtime(), snapBefore = snapshotTime()
+        let before = mtime()
         Thread.sleep(forTimeInterval: 1.1)
         clock.advance(120) // even the "Updated" minute changes
         c.refresh()
         XCTAssertEqual(mtime(), before)
-        XCTAssertEqual(snapshotTime(), snapBefore)
     }
 
     func testOutsideEditIsLoggedOnceAndAppEditsAreNotDoubled() throws {
@@ -69,25 +64,17 @@ final class CoordinatorTests: XCTestCase {
         try c.startFocus(task: c.store.find("r7q2"))
         XCTAssertEqual(c.store.find("r7q2")?.status, .inProgress)
         XCTAssertTrue(read(config.now).contains("focusing on \"Finalize resume\""))
-        XCTAssertNotNil(WidgetBridge.read(from: widgets).timerEnd)
+        XCTAssertNotNil(c.engine.countdownEnd)
 
         // App restarts mid-session.
         clock.advance(600)
-        let c2 = Coordinator(config: config, calendar: dubai, clock: clock, supportDir: support, widgetDir: widgets)
+        let c2 = Coordinator(config: config, calendar: dubai, clock: clock, supportDir: support)
         XCTAssertEqual(c2.engine.focusedS, 600)
         clock.advance(900)
         let record = try XCTUnwrap(c2.tick())
         c2.sessionEnded(record)
         XCTAssertEqual(c2.store.find("r7q2")?.actualSessions, 1)
         XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("## Focus log"))
-    }
-
-    func testWidgetTapsAreApplied() throws {
-        c.refresh()
-        try WidgetBridge.enqueue(WidgetCommand(action: .toggleTask, taskID: "r7q2", at: clock.now()), in: widgets)
-        c.drainWidgetCommands()
-        XCTAssertEqual(c.store.find("r7q2")?.status, .done)
-        XCTAssertTrue(WidgetBridge.drain(in: widgets).isEmpty)
     }
 
     func testNightlyWritesStatsInsightsSummaryAndIndex() throws {
@@ -110,7 +97,7 @@ final class CoordinatorTests: XCTestCase {
     }
 
     /// Regression for the mismatch Hermes reported: Now.md said 2 of 9 while the note's summary said 1 of 8.
-    func testNowNoteSummaryAndWidgetAlwaysAgree() throws {
+    func testNowAndNoteSummaryAlwaysAgree() throws {
         c.refresh()
         try c.nightly() // writes the summary in the morning
         // During the day: a task is ticked in Obsidian, Hermes adds one, and one is ticked in the panel.
@@ -127,8 +114,6 @@ final class CoordinatorTests: XCTestCase {
         let now = count(read(config.now)), note = count(read(url))
         XCTAssertEqual(now, "- Tasks: 2 of 3 done")
         XCTAssertEqual(note, now, "the note's summary must match Now.md without waiting for the nightly pass")
-        let w = WidgetBridge.read(from: widgets)
-        XCTAssertEqual("- Tasks: \(w.doneCount) of \(w.totalCount) done", now)
         XCTAssertEqual(c.todayTotals().done, 2)
         // Only one summary section, even after many updates.
         XCTAssertEqual(read(url).components(separatedBy: "## PastelFocus summary").count, 2)

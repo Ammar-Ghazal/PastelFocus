@@ -101,14 +101,8 @@ public final class FocusEngine {
 
     public var isStopwatch: Bool { active?.isStopwatch ?? false }
 
-    /// When a countdown hits 00:00, for notifications and widgets. Nil for a stopwatch.
+    /// When a countdown hits 00:00, for notifications. Nil for a stopwatch.
     public var countdownEnd: Date? { isStopwatch ? nil : endDate }
-
-    /// When a running stopwatch started counting, adjusted for pauses (lets widgets count up by themselves).
-    public var stopwatchStart: Date? {
-        guard isStopwatch, let a = active, let since = a.runningSince else { return nil }
-        return since.addingTimeInterval(-TimeInterval(a.bankedS))
-    }
 
     /// When the running session ends on its own (for a stopwatch: the safety cap).
     public var endDate: Date? {

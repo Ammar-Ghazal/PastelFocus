@@ -18,10 +18,10 @@ Implement one coherent behavior at a time. Review both the diff and the running 
 
 ## Current system
 
-- Native macOS 14+ app: SwiftUI menu, three AppKit desktop panels, settings and insights windows, plus a WidgetKit extension.
+- Native macOS 14+ app: SwiftUI menu, three AppKit desktop panels, and settings and insights windows.
 - Local `PastelFocusCore` package contains task parsing, timer state, session recording, reports, garden growth, and suggestions. There are no third-party runtime package dependencies; SQLite is supplied by the system.
 - Markdown notes currently own task content. Monthly JSONL files hold sessions and task events. A private JSON snapshot restores the timer.
-- Reports, garden state, widget snapshots, and the SQLite index are derived from those inputs.
+- Reports, garden state, and the SQLite index are derived from those inputs.
 - FSEvents triggers debounced refreshes. The main-actor app model currently calls the coordinator synchronously for file operations and derived calculations.
 
 Useful existing foundations: a timer engine with an injected clock, separate timer display updates, cached parsing of unchanged log files, write-if-changed guards, and core behavior tests. Preserve these unless a requirement calls for a different design.
@@ -33,22 +33,21 @@ These are source-review findings, not measured performance results or reproduced
 | Finding | Practical consequence | Evidence |
 | --- | --- | --- |
 | Session recording errors are ignored before saving the new timer state. Recording also spans several files without deduplication by session ID. | A write failure can lose a session; a crash during partial completion can replay it. Agree on durable completion and recovery before refactoring. | `Coordinator.sessionEnded`, `SessionRecorder.record` |
-| Widget commands bypass the app's notification scheduling/cancellation. The shared command file is cleared before commands are applied. | Controls can disagree about reminders; failed or interrupted execution can lose actions. Concurrent append/clear can also race. | `Coordinator.drainWidgetCommands`, `WidgetBridge.drain`, `AppModel.pause/resume/startFocus` |
 | Development mode separates settings and support state but still defaults to the real Obsidian vault. Snapshot rendering initializes the normal model. | A preview or development run can change personal notes. Make a temporary fixture vault the default for both. | `AppSettings`, `AppDelegate.applicationDidFinishLaunching` |
 | A one-second timer is scheduled while idle. Refresh and publication repeatedly scan tasks and derive history summaries and garden state on the main actor. | Avoidable wakeups and growing work as the vault grows. Measure before assigning numerical savings. | `AppModel.start/startTicker/publish`, `TaskStore.scan/stampMissingIDs`, `Coordinator.todayTotals/garden` |
 | The SQLite index is rebuilt but production code does not call its query helpers. | Maintenance and writes without a current read benefit. Remove it if no agreed feature uses it; keep or redesign it only for a demonstrated need. | `IndexDatabase`, `Coordinator.nightly`, repository references |
 | The ambient-motion preference does not govern every animated effect. | The setting does not fully express a quiet/static experience. Define one motion policy for visibility, preference, and Reduce Motion. | `PixelArt.AmbientLayer`, `FocusView.BreathingGlow`, `Theme.GlassBackground` |
 
-Additional behavior decisions: handling simultaneous Obsidian edits, folder permission failures, sleep, long pauses, quit/relaunch, expired widget actions, and suggestions that interrupt starting a session. Atomic file replacement alone does not establish safe coordination with another writer.
+Additional behavior decisions: handling simultaneous Obsidian edits, folder permission failures, sleep, long pauses, quit/relaunch, and suggestions that interrupt starting a session. Atomic file replacement alone does not establish safe coordination with another writer.
 
 ## Provisional architecture
 
 For the current local-app scope, evolve the existing layered app rather than introduce another framework:
 
 - **Presentation:** SwiftUI/AppKit reads view state and issues user commands.
-- **Application commands:** one route for starting, pausing, resuming, stopping, and changing tasks, regardless of menu, shortcut, widget, or Hermes input. Each route applies the same persistence and notification rules.
+- **Application commands:** one route for starting, pausing, resuming, stopping, and changing tasks, regardless of menu, shortcut, or Hermes input. Each route applies the same persistence and notification rules.
 - **Domain:** retain deterministic timer, task, and garden rules that can be tested without launching macOS UI.
-- **Storage and OS adapters:** one serialized owner for mutable state and file work, with explicit outcomes; keep expensive file/history work off the main actor. Notifications, login items, folder access, and widgets remain small adapters.
+- **Storage and OS adapters:** one serialized owner for mutable state and file work, with explicit outcomes; keep expensive file/history work off the main actor. Notifications, login items, and folder access remain small adapters.
 - **Derived views:** cache summaries and garden state by their actual inputs. Rebuild projections after relevant changes, rather than on every publication.
 
 The authoritative storage choice remains open. Obsidian as the task authority requires an external-edit/conflict policy. An app-owned task store with Obsidian export is a different product and should not be introduced implicitly.
@@ -62,7 +61,7 @@ Add an abstraction only when it protects a boundary, makes an important behavior
 | 1. Purpose and scope | Primary user outcome, essential first-version features, menu/panel/window model | Product brief and explicit deferred features |
 | 2. Look and feel | Density, visual style, motion, keyboard interaction, interruption level, accessibility | One agreed primary screen and interaction rules |
 | 3. Behavior | Complete task-to-focus journey; pause, sleep, rest, stop, completion, and restart | State diagram and acceptance scenarios |
-| 4. Data and architecture | Obsidian ownership, offline behavior, failures, recovery, widget commands, module boundaries | Architecture diagram and brief decision record |
+| 4. Data and architecture | Obsidian ownership, offline behavior, failures, recovery, module boundaries | Architecture diagram and brief decision record |
 | 5. Performance and implementation | Representative vault size, responsiveness/energy targets, prioritized fixes | Baseline measurements and one small implementation slice |
 | 6. Delivery | CI, personal trials, beta criteria, sandbox/folder access, App Store readiness and versioning | Release checklist tied to evidence |
 
@@ -72,7 +71,7 @@ The first three questions are pending: primary purpose, normal presentation, and
 
 Start with measurements of idle/hidden, idle/visible with motion on and off, active focus, external note edits, and a large synthetic vault. Record CPU, wakeups, memory, launch time, refresh latency, and UI responsiveness. Include graphics/WindowServer cost when assessing animated panels.
 
-Likely first candidates: stop the display ticker while idle; replace periodic full work with events and necessary deadlines; retain changed file paths and cache unaffected task parses; compute a day's totals and garden once per relevant revision; keep widget timer rendering based on start/end dates; suspend decorative animation when hidden; remove an unused index if scope confirms it is unnecessary.
+Likely first candidates: stop the display ticker while idle; replace periodic full work with events and necessary deadlines; retain changed file paths and cache unaffected task parses; compute a day's totals and garden once per relevant revision; suspend decorative animation when hidden; remove an unused index if scope confirms it is unnecessary.
 
 Do not promise zero CPU, instantaneous updates, or arbitrary numerical targets before profiling on a stated machine and dataset. Apple's guidance supports reducing timers, unnecessary work, and main-thread blocking: [Mac energy efficiency](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/power_efficiency_guidelines_osx/BestPractices.html), [app responsiveness](https://developer.apple.com/documentation/xcode/improving-app-responsiveness), and [SwiftUI performance](https://developer.apple.com/documentation/Xcode/understanding-and-improving-swiftui-performance).
 
