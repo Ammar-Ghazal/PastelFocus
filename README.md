@@ -2,6 +2,8 @@
 
 A local-first macOS app with three pastel desktop panels — **Today** (tasks), **Focus** (Pomodoro/Forest-style timer) and **Night Garden** (progress) — that shares everything with the Hermes agent through the Obsidian vault. No server, no cloud, no paid dependencies.
 
+Development process: [Development and release workflow](docs/DEVELOPMENT_WORKFLOW.md) — testing, fixes, ChatGPT/Claude handoffs, and Mac App Store releases.
+
 Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d8ee-4438-93d8-57e2d7ddb60d) · [Visual design](https://claude.ai/code/artifact/272891d3-76e0-4dc8-9a34-2c92d15eb115)
 
 ## Architecture
@@ -115,17 +117,18 @@ Each finished focus session plants a pixel sprite (species by category, size by 
 
 ## Build, test, install
 
-```bash
-swift test                      # 86 unit/integration tests for PastelFocusCore
-./scripts/install.sh            # xcodegen + Release build → ~/Applications, relaunch
-./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/PastelFocus --render-snapshots /tmp/pf   # PNGs of every panel, both themes
-```
-
-Run a separate copy for development or benchmarking without touching the installed app's timer or settings (own settings suite, temp support folder, no widgets, login item or hot keys):
+Xcode's window can stay closed: XcodeGen generates the project from `project.yml`, and `xcodebuild` builds the native macOS app and widget using the installed Xcode tools. Full Xcode is required. See the [terminal development workflow](docs/DEVELOPMENT_WORKFLOW.md#4-the-daily-terminal-build-test-and-fix-loop) for setup, isolated launches, screenshots, and release archives.
 
 ```bash
-PASTELFOCUS_DEV=bench ./build/Build/Products/Debug/PastelFocus.app/Contents/MacOS/PastelFocus
+swift test                      # 86 unit/integration tests for PastelFocusCore; does not package the app
+xcodegen generate
+xcodebuild -project PastelFocus.xcodeproj -scheme PastelFocus -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath build build
 ```
+
+The existing `./scripts/install.sh` builds Release, installs to `~/Applications`, and relaunches. Its error handling needs correction before relying on it: a suppressed build failure can leave an older app available for installation.
+
+`PASTELFOCUS_DEV=<name>` uses a separate settings suite and temporary support folder, and disables widgets, login registration, and hot keys. It still defaults to the real vault and shares some state. Use the workflow's separate test account and fixture-vault setup before launching development copies or rendering snapshots.
 
 Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXRF` (signing + App Group `58FZ49BXRF.com.ammarghazal.pastelfocus` for widgets).
 
