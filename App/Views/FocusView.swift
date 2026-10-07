@@ -40,9 +40,6 @@ struct FocusView: View {
                             .transition(.opacity)
                         }
                     }
-                    HStack(spacing: 6) {
-                        ForEach(0..<4) { i in Circle().fill(i == model.cycleIndex ? theme.accent : theme.track).frame(width: 6, height: 6) }
-                    }
                 }
                 Spacer(minLength: 0)
             }
