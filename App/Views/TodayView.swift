@@ -21,8 +21,8 @@ struct TodayView: View {
             Divider().overlay(theme.border)
             footer
         }
-        .padding(.horizontal, 24).padding(.vertical, 22)
-        .frame(width: 560, height: 690)
+        .padding(PanelStyle.padding)
+        .frame(width: 560, height: 690, alignment: .topLeading)
         .background(GlassBackground(sceneOpacity: 0.28))
         .overlay(alignment: .bottom) { ToastView().padding(.bottom, 12) }
     }
@@ -30,10 +30,7 @@ struct TodayView: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) {
-                    SpriteView(rows: Sprite.sparkle, px: 3)
-                    Text("Today").font(theme.titleFont(28)).tracking(-0.5).foregroundStyle(theme.accent)
-                }
+                PanelTitle("Today")
                 Text("“\(Self.quotes[Calendar.current.component(.day, from: Date()) % Self.quotes.count])”")
                     .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
             }

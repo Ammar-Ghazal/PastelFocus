@@ -15,8 +15,7 @@ struct FocusView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                SpriteView(rows: Sprite.target, px: 2)
-                Text("Focus").font(theme.titleFont(17, .semibold)).foregroundStyle(theme.accent)
+                PanelTitle("Focus")
                 Spacer()
                 modeToggle
                 if snapshot { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) } else { menu }
@@ -49,8 +48,9 @@ struct FocusView: View {
             }
             gardenRow
         }
-        .padding(18)
-        .frame(width: 300, height: 230)
+        .padding(PanelStyle.padding)
+        // Top-aligned: centring in the fixed height left a bigger gap above the title than the other panels.
+        .frame(width: 300, height: 230, alignment: .topLeading)
         .background(GlassBackground(radius: 18))
         .onHover { hover = $0 }
         .overlay { cards }
@@ -336,8 +336,7 @@ struct ProgressPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                SpriteView(rows: Sprite.sparkle, px: 2)
-                Text("Night Garden").font(theme.titleFont(17, .semibold)).foregroundStyle(theme.accent)
+                PanelTitle("Night Garden")
                 Spacer()
                 if snapshot { Text("Week · Month").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
                 else { Picker("", selection: $month) { Text("Week").tag(false); Text("Month").tag(true) }.pickerStyle(.segmented).frame(width: 130) }
@@ -362,8 +361,8 @@ struct ProgressPanelView: View {
                     .buttonStyle(.plain).foregroundStyle(theme.textSecondary).help("Save this month as a postcard in the vault")
             }
         }
-        .padding(20)
-        .frame(width: 380, height: 280)
+        .padding(PanelStyle.padding)
+        .frame(width: 380, height: 280, alignment: .topLeading)
         .background(GlassBackground(radius: 18))
     }
 
