@@ -7,14 +7,18 @@ final class CareerCoachContractTests: XCTestCase {
         guard let path = ProcessInfo.processInfo.environment["PASTELFOCUS_COACH_FIXTURE"] else {
             throw XCTSkip("Run against the explicit disposable Hermes output fixture when available")
         }
-        let root = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        XCTAssertTrue(root.path.contains("/review/coach-runs/") && root.lastPathComponent == "test-vault")
-        guard root.path.contains("/review/coach-runs/"), root.lastPathComponent == "test-vault" else { return }
+        let source = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        XCTAssertTrue(source.path.contains("/review/coach-runs/") && source.lastPathComponent == "test-vault")
+        guard source.path.contains("/review/coach-runs/"), source.lastPathComponent == "test-vault" else { return }
+        // Work on a copy: refresh rewrites the Inbox, Now.md and the summary, and the run must stay as recorded.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("coach-fixture-\(UUID().uuidString)/test-vault")
+        try FileManager.default.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: source, to: root)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         let config = VaultConfig(root: root, privateLogs: root.appendingPathComponent(".private-logs"))
         let clock = FixedClock("2026-10-07T05:00:00Z")
         let coordinator = Coordinator(config: config, calendar: dubai, clock: clock,
                                       supportDir: root.appendingPathComponent(".support"))
-        let existingNote = read(config.dailyNote("2026-10-07"))
         let rawInbox = read(config.inbox)
         XCTAssertTrue(rawInbox.contains("- [x] priority 🆔 fixture1 medium → applied 08:00 by hermes"))
         let pending = rawInbox.components(separatedBy: "\n").filter { $0.hasPrefix("- [ ] ") }
@@ -37,9 +41,18 @@ final class CareerCoachContractTests: XCTestCase {
         XCTAssertEqual(made.priority, .high)
         XCTAssertTrue(read(config.inbox).contains("→ created 🆔 " + made.taskID!))
         XCTAssertFalse(read(config.inbox).contains("→ error:"))
-        XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("App-owned synthetic log: preserve."))
-        // Refresh updates app-owned summary content in this fixture, while preserving unrelated prose.
-        XCTAssertTrue(existingNote.contains("App-owned synthetic totals: preserve."))
+        // After refresh: the Focus log is kept, and the app replaces its own summary with real totals
+        // that match Now.md (one section, not appended).
+        let note = read(config.dailyNote("2026-10-07"))
+        XCTAssertTrue(note.contains("App-owned synthetic log: preserve."))
+        XCTAssertTrue(note.contains("- [ ] Synthetic existing deliverable"), "task lines are kept")
+        XCTAssertEqual(note.components(separatedBy: "## PastelFocus summary").count, 2)
+        XCTAssertFalse(note.contains("App-owned synthetic totals: preserve."), "the app-owned summary is regenerated")
+        func tasksLine(_ text: String) -> String? {
+            text.range(of: #"- Tasks: \d+ of \d+ done"#, options: .regularExpression).map { String(text[$0]) }
+        }
+        XCTAssertNotNil(tasksLine(note))
+        XCTAssertEqual(tasksLine(note), tasksLine(read(config.now)))
         XCTAssertTrue(read(config.now).contains("# Now"))
         XCTAssertTrue(coordinator.refresh().isEmpty)
         XCTAssertEqual(coordinator.store.scan().tasks.count, 2, "Repeated refresh cannot replay consumed commands")
