@@ -88,126 +88,154 @@ struct SpriteView: View {
     }
 }
 
-/// One week's island: pixel plants on a grid, landmarks, fireflies drifting at 8 fps.
-struct IslandView: View {
-    @Environment(\.theme) private var theme
-    let island: Island?
-    let landmarks: [Landmark]
-    var cell: CGFloat = 26
-    var animate = true
+/// Where everything sits on an isometric plot drawn into `size`. Tiles shrink as the plot grows,
+/// which is the "zoom out" (shared by the drawing and the animated layer so they line up).
+struct IsoGeometry {
+    let side: Int
+    let size: CGSize
 
-    /// Only fireflies and the waterfall move; without them nothing is redrawn.
-    private var moving: Bool { animate && ((island?.fireflies ?? 0) > 0 || landmarks.contains(.waterfall)) }
+    /// Tile width; a tile is half as tall as it is wide.
+    let tile: CGFloat
+    /// Depth of the soil block under the grass.
+    let depth: CGFloat
+    /// Top (back) corner of the grass.
+    let apex: CGPoint
+
+    init(side: Int, size: CGSize) {
+        self.side = side
+        self.size = size
+        let n = CGFloat(side)
+        // Height needed per tile width: the diamond (n/2), the soil (0.6) and room for the back row's plants (1.1).
+        tile = max(1, min(size.width * 0.94 / n, (size.height - 4) / (n / 2 + 1.7)))
+        depth = max(4, tile * 0.6)
+        let total = tile * 1.1 + n * tile / 2 + depth
+        apex = CGPoint(x: size.width / 2, y: (size.height - total) / 2 + tile * 1.1)
+    }
+
+    var halfWidth: CGFloat { CGFloat(side) * tile / 2 }
+    var left: CGPoint { CGPoint(x: apex.x - halfWidth, y: apex.y + halfWidth / 2) }
+    var right: CGPoint { CGPoint(x: apex.x + halfWidth, y: apex.y + halfWidth / 2) }
+    var front: CGPoint { CGPoint(x: apex.x, y: apex.y + halfWidth) }
+
+    /// Centre of a tile's top face.
+    func centre(_ x: Int, _ y: Int) -> CGPoint { point(CGFloat(x) + 0.5, CGFloat(y) + 0.5) }
+
+    /// Any point on the grass, in tile units.
+    func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        CGPoint(x: apex.x + (x - y) * tile / 2, y: apex.y + (x + y) * tile / 4)
+    }
+
+    func diamond(_ x: Int, _ y: Int) -> Path {
+        let fx = CGFloat(x), fy = CGFloat(y)
+        var p = Path()
+        p.move(to: point(fx, fy)); p.addLine(to: point(fx + 1, fy)); p.addLine(to: point(fx + 1, fy + 1)); p.addLine(to: point(fx, fy + 1))
+        p.closeSubpath()
+        return p
+    }
+
+    /// Pixel size for an 8-pixel-wide sprite filling most of a tile.
+    var px: CGFloat { tile * 0.8 / 8 }
+}
+
+/// A period's garden as a Forest-style isometric block of land. Drawn once; only fireflies and the
+/// waterfall move, as Core Animation layers.
+struct IsoPlotView: View {
+    @Environment(\.theme) private var theme
     @Environment(\.snapshotMode) private var snapshot
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let plot: GardenPlot
+    var animate = true
+
+    private var moving: Bool { animate && !snapshot && !reduceMotion && (plot.fireflies > 0 || plot.landmarks.contains(.waterfall)) }
 
     var body: some View {
-        // The island is drawn once; only the small overlay animates (keeps CPU low).
         Canvas { ctx, size in
             var c = ctx
-            drawStatic(&c, size: size)
+            draw(&c, IsoGeometry(side: plot.side, size: size))
         }
         .overlay {
-            if moving && !snapshot && !reduceMotion {
-                // Core Animation runs in the render server, so the app itself stays near 0% CPU.
-                AmbientLayer(fireflies: min(island?.fireflies ?? 0, 40), waterfall: landmarks.contains(.waterfall),
-                             cell: cell, columns: Garden.columns, rows: Garden.rows)
-            } else {
-                Canvas { ctx, size in
-                    var c = ctx
-                    drawMoving(&c, size: size, t: 0)
-                }
+            if moving {
+                AmbientLayer(fireflies: min(plot.fireflies, 40), waterfall: plot.landmarks.contains(.waterfall), side: plot.side)
             }
         }
-        .frame(width: cell * CGFloat(Garden.columns) + 24, height: cell * CGFloat(Garden.rows) + 34)
     }
 
-    private var geometry: (w: CGFloat, h: CGFloat, px: CGFloat) {
-        (cell * CGFloat(Garden.columns), cell * CGFloat(Garden.rows), max(2, (cell / 8).rounded(.down)))
-    }
-
-    private func drawStatic(_ ctx: inout GraphicsContext, size: CGSize) {
-        let (w, h, px) = geometry
-        let ox = (size.width - w) / 2, oy: CGFloat = 16
-        // Island ground: layered rounded blobs.
-        let ground = Path(roundedRect: CGRect(x: ox - 8, y: oy + 6, width: w + 16, height: h + 4), cornerRadius: 22)
-        ctx.fill(ground, with: .color(theme.groundShade))
-        ctx.fill(Path(roundedRect: CGRect(x: ox - 4, y: oy + 2, width: w + 8, height: h), cornerRadius: 20), with: .color(theme.ground))
-        ctx.fill(Path(roundedRect: CGRect(x: ox - 8, y: oy + h + 2, width: w + 16, height: 10), cornerRadius: 5), with: .color(theme.sceneTop))
-
-        func centre(_ x: Int, _ y: Int) -> CGPoint { CGPoint(x: ox + (CGFloat(x) + 0.5) * cell, y: oy + (CGFloat(y) + 1) * cell) }
-
-        for lm in landmarks {
-            switch lm {
-            case .path:
-                for (x, y) in lm.cells { ctx.fill(Path(ellipseIn: CGRect(x: centre(x, y).x - cell * 0.35, y: centre(x, y).y - cell * 0.4, width: cell * 0.7, height: cell * 0.3)), with: .color(Color(hex: 0xF8DFA1, opacity: 0.55))) }
-            case .pond:
-                let a = centre(9, 4), b = centre(10, 5)
-                ctx.fill(Path(ellipseIn: CGRect(x: a.x - cell * 0.5, y: a.y - cell * 0.8, width: b.x - a.x + cell, height: b.y - a.y + cell * 0.7)), with: .color(Color(hex: 0x5FB3C4, opacity: 0.85)))
-            case .stoneLantern: Sprite.draw(Sprite.stoneLantern, in: &ctx, anchor: centre(5, 1), px: px)
-            case .redBridge: Sprite.draw(Sprite.bridge, in: &ctx, anchor: centre(8, 4), px: px)
-            case .smallHouse: Sprite.draw(Sprite.house, in: &ctx, anchor: CGPoint(x: centre(2, 0).x + cell / 2, y: centre(2, 0).y), px: px)
-            case .waterfall:
-                let top = centre(11, 0)
-                ctx.fill(Path(CGRect(x: top.x - px * 2, y: top.y - cell, width: px * 4, height: cell * 2)), with: .color(Color(hex: 0x5FB3C4, opacity: 0.6)))
-            }
+    private func draw(_ ctx: inout GraphicsContext, _ g: IsoGeometry) {
+        let down = CGSize(width: 0, height: g.depth)
+        // Soft shadow, then the soil block's two visible faces, then the grass.
+        let shadowH = g.halfWidth * 0.22
+        ctx.fill(Path(ellipseIn: CGRect(x: g.left.x + g.halfWidth * 0.1, y: g.front.y + g.depth - shadowH * 0.55, width: g.halfWidth * 1.8, height: shadowH)),
+                 with: .color(.black.opacity(0.16)))
+        for (a, b, shade) in [(g.left, g.front, 0.0), (g.front, g.right, 0.22)] {
+            var face = Path()
+            face.move(to: a); face.addLine(to: b); face.addLine(to: b + down); face.addLine(to: a + down); face.closeSubpath()
+            ctx.fill(face, with: .color(theme.groundShade))
+            ctx.fill(face, with: .color(.black.opacity(shade)))
+            var lip = Path() // grass hanging over the soil edge
+            lip.move(to: a); lip.addLine(to: b); lip.addLine(to: b + CGSize(width: 0, height: g.depth * 0.22)); lip.addLine(to: a + CGSize(width: 0, height: g.depth * 0.22))
+            ctx.fill(lip, with: .color(theme.ground))
+            ctx.fill(lip, with: .color(.black.opacity(shade * 0.6)))
         }
+        for x in 0..<g.side { for y in 0..<g.side {
+            ctx.fill(g.diamond(x, y), with: .color(theme.ground))
+            if (x + y) % 2 == 0 { ctx.fill(g.diamond(x, y), with: .color(.white.opacity(0.05))) }
+        } }
 
-        for item in (island?.items ?? []).sorted(by: { $0.y < $1.y }) {
-            let scale: CGFloat
-            switch item.size {
-            case .large?: scale = 1.5
-            case .medium?: scale = 1.2
-            default: scale = 1
-            }
-            Sprite.draw(Sprite.forItem(item), in: &ctx, anchor: centre(item.x, item.y), px: (px * scale).rounded(),
+        drawLandmarks(&ctx, g)
+
+        // Back to front, so nearer plants overlap farther ones.
+        for item in plot.items.sorted(by: { ($0.x + $0.y, $0.x) < ($1.x + $1.y, $1.x) }) {
+            let scale: CGFloat = item.size == .large ? 1.35 : item.size == .medium ? 1.15 : 1
+            let c = g.centre(item.x, item.y)
+            Sprite.draw(Sprite.forItem(item), in: &ctx, anchor: CGPoint(x: c.x, y: c.y + g.tile * 0.12), px: g.px * scale,
                         tint: item.variant == .golden ? Color(hex: 0xF8DFA1) : nil, glow: item.variant != .normal)
         }
 
-    }
-
-    private func drawMoving(_ ctx: inout GraphicsContext, size: CGSize, t: Double) {
-        let (w, h, px) = geometry
-        let ox = (size.width - w) / 2, oy: CGFloat = 16
-        if landmarks.contains(.waterfall) {
-            let top = CGPoint(x: ox + 11.5 * cell, y: oy + cell)
-            for i in 0..<4 {
-                let yy = top.y - cell + CGFloat((Int(t * 8) + i * 3) % 12) * cell / 6
-                ctx.fill(Path(CGRect(x: top.x - px, y: yy, width: px * 2, height: px * 3)), with: .color(Color(hex: 0x8DE4E6, opacity: 0.8)))
+        if !moving { // still frame: fireflies as dots
+            for p in AmbientLayer.fireflyPoints(min(plot.fireflies, 40), g) {
+                ctx.fill(Path(ellipseIn: CGRect(x: p.x - 1, y: p.y - 1, width: 2, height: 2)), with: .color(Color(hex: 0xF8DFA1, opacity: 0.75)))
             }
         }
-        // Fireflies: one per task finished this week.
-        let flies = island?.fireflies ?? 0
-        for i in 0..<min(flies, 40) {
-            var rng = SeededRandom(seed: UInt64(i + 1) &* 7919)
-            let bx = CGFloat.random(in: 0...1, using: &rng), by = CGFloat.random(in: 0...1, using: &rng)
-            let phase = Double.random(in: 0...6.28, using: &rng)
-            let x = ox + bx * w + CGFloat(sin(t * 0.7 + phase)) * 6, y = oy + by * h * 0.8 + CGFloat(cos(t * 0.5 + phase)) * 4
-            let a = 0.45 + 0.4 * sin(t * 2 + phase)
-            ctx.fill(Path(CGRect(x: x, y: y, width: 2, height: 2)), with: .color(Color(hex: 0xF8DFA1, opacity: a)))
+    }
+
+    private func drawLandmarks(_ ctx: inout GraphicsContext, _ g: IsoGeometry) {
+        for lm in plot.landmarks {
+            let tiles = lm.tiles(side: g.side)
+            switch lm {
+            case .path:
+                for t in tiles { ctx.fill(g.diamond(t.x, t.y), with: .color(Color(hex: 0xF8DFA1, opacity: 0.45))) }
+            case .pond:
+                for t in tiles { ctx.fill(g.diamond(t.x, t.y), with: .color(Color(hex: 0x5FB3C4, opacity: 0.9))) }
+            case .stoneLantern:
+                Sprite.draw(Sprite.stoneLantern, in: &ctx, anchor: g.centre(tiles[0].x, tiles[0].y), px: g.px)
+            case .redBridge:
+                Sprite.draw(Sprite.bridge, in: &ctx, anchor: g.centre(tiles[0].x, tiles[0].y), px: g.px)
+            case .smallHouse:
+                let a = g.centre(tiles[0].x, tiles[0].y), b = g.centre(tiles[1].x, tiles[1].y)
+                Sprite.draw(Sprite.house, in: &ctx, anchor: CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + g.tile * 0.15), px: g.px)
+            case .waterfall:
+                let r = g.right
+                ctx.fill(Path(CGRect(x: r.x - g.px * 3, y: r.y - g.tile * 0.2, width: g.px * 2.5, height: g.depth + g.tile * 0.4)),
+                         with: .color(Color(hex: 0x5FB3C4, opacity: 0.7)))
+            }
         }
     }
 }
 
-/// Monthly postcard rendered to PNG at month end.
+private func + (p: CGPoint, s: CGSize) -> CGPoint { CGPoint(x: p.x + s.width, y: p.y + s.height) }
+
+/// Monthly postcard rendered to PNG.
 struct PostcardView: View {
     @Environment(\.theme) private var theme
-    let month: String
-    let islands: [Island]
+    let title: String
+    let plot: GardenPlot
     let garden: Garden
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("✦ \(month)").font(theme.titleFont(22)).foregroundStyle(theme.accent)
-            HStack(spacing: 10) {
-                ForEach(islands, id: \.week) { island in
-                    VStack(spacing: 4) {
-                        IslandView(island: island, landmarks: garden.landmarks, cell: 14, animate: false)
-                        Text(island.week).font(.system(size: 10, design: .monospaced)).foregroundStyle(theme.textSecondary)
-                    }
-                }
-            }
-            Text("\(garden.goodDays) good days · \(islands.flatMap(\.items).filter { $0.kind == .plant }.count) plants")
+            Text(title).font(theme.titleFont(22)).foregroundStyle(theme.accent)
+            IsoPlotView(plot: plot, animate: false).frame(width: 520, height: 360)
+            Text("\(plot.items.filter { $0.kind == .plant }.count) plants · \(garden.goodDays) good days")
                 .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
         }
         .padding(24)
@@ -215,14 +243,21 @@ struct PostcardView: View {
     }
 }
 
-
 /// Fireflies and waterfall drops as CALayers with repeating animations (no per-frame app work).
 struct AmbientLayer: NSViewRepresentable {
     let fireflies: Int
     let waterfall: Bool
-    let cell: CGFloat
-    let columns: Int
-    let rows: Int
+    let side: Int
+
+    /// Where each firefly hovers, a little above the grass (seeded, so they don't jump between redraws).
+    static func fireflyPoints(_ count: Int, _ g: IsoGeometry) -> [CGPoint] {
+        (0..<count).map { i in
+            var rng = SeededRandom(seed: UInt64(i + 1) &* 7919)
+            let n = CGFloat(g.side)
+            let p = g.point(CGFloat.random(in: 0.5...(n - 0.5), using: &rng), CGFloat.random(in: 0.5...(n - 0.5), using: &rng))
+            return CGPoint(x: p.x, y: p.y - g.tile * CGFloat.random(in: 0.4...1.2, using: &rng))
+        }
+    }
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
@@ -235,18 +270,15 @@ struct AmbientLayer: NSViewRepresentable {
     }
 
     private func build(in v: NSView) {
-        guard let root = v.layer else { return }
+        guard let root = v.layer, v.bounds.width > 0 else { return }
         root.sublayers?.forEach { $0.removeFromSuperlayer() }
-        let w = cell * CGFloat(columns), h = cell * CGFloat(rows)
-        let ox = (v.bounds.width - w) / 2
-        // NSView layers are flipped relative to the Canvas: y grows upwards.
-        let top = v.bounds.height - 16
-        for i in 0..<fireflies {
-            var rng = SeededRandom(seed: UInt64(i + 1) &* 7919)
-            let x = ox + CGFloat.random(in: 0...1, using: &rng) * w
-            let y = top - CGFloat.random(in: 0...1, using: &rng) * h * 0.8
+        let g = IsoGeometry(side: side, size: v.bounds.size)
+        let h = v.bounds.height // layers have y growing upwards; the Canvas grows downwards
+        for (i, p) in Self.fireflyPoints(fireflies, g).enumerated() {
+            var rng = SeededRandom(seed: UInt64(i + 101) &* 104_729)
             let fly = CALayer()
-            fly.frame = CGRect(x: x, y: y, width: 2, height: 2)
+            fly.frame = CGRect(x: p.x - 1, y: h - p.y - 1, width: 2, height: 2)
+            fly.cornerRadius = 1
             fly.backgroundColor = NSColor(red: 0.973, green: 0.875, blue: 0.631, alpha: 1).cgColor
             let blink = CABasicAnimation(keyPath: "opacity")
             blink.fromValue = 0.1; blink.toValue = 0.9
@@ -261,17 +293,16 @@ struct AmbientLayer: NSViewRepresentable {
             root.addSublayer(fly)
         }
         if waterfall {
-            let px = max(2, (cell / 8).rounded(.down))
-            let x = ox + 11.5 * cell
+            let top = h - (g.right.y - g.tile * 0.2), fallBy = g.depth + g.tile * 0.4
             for i in 0..<4 {
                 let drop = CALayer()
-                drop.frame = CGRect(x: x - px, y: top, width: px * 2, height: px * 3)
-                drop.backgroundColor = NSColor(red: 0.553, green: 0.894, blue: 0.902, alpha: 0.8).cgColor
+                drop.frame = CGRect(x: g.right.x - g.px * 2.5, y: top, width: g.px * 1.5, height: g.px * 3)
+                drop.backgroundColor = NSColor(red: 0.553, green: 0.894, blue: 0.902, alpha: 0.85).cgColor
                 let fall = CABasicAnimation(keyPath: "position.y")
                 fall.fromValue = top
-                fall.toValue = top - cell * 2
-                fall.duration = 1.5
-                fall.timeOffset = Double(i) * 0.375
+                fall.toValue = top - fallBy
+                fall.duration = 1.2
+                fall.timeOffset = Double(i) * 0.3
                 fall.repeatCount = .infinity
                 drop.add(fall, forKey: "fall")
                 root.addSublayer(drop)

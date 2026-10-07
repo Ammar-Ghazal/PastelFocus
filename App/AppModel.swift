@@ -447,10 +447,8 @@ final class AppModel: ObservableObject {
 
     func savePostcard(month: String? = nil) {
         let m = month ?? String(coordinator.today.prefix(7))
-        let islands = garden.islands.filter { island in
-            island.items.contains { $0.day.hasPrefix(m) }
-        }
-        let view = PostcardView(month: m, islands: islands, garden: garden).environment(\.theme, theme)
+        let plot = garden.plot(.month, containing: m + "-01", calendar: coordinator.calendar)
+        let view = PostcardView(title: m, plot: plot, garden: garden).environment(\.theme, theme)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

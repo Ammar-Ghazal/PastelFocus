@@ -67,6 +67,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]
         save("stop-reason", StopReasonCard(settings: demo, done: { _ in }, cancel: {}).frame(width: 280).environment(\.theme, t))
         save("appearance", AppearanceView(settings: settings).frame(width: 760, height: 640).environment(\.theme, t))
+        // Garden plots from 2 to 120 sessions, to check how the plot grows and zooms out.
+        let cal = model.coordinator.calendar, today = model.coordinator.today
+        let cats = ["coding", "learning", "health", "personal", nil]
+        for n in [2, 12, 40, 120] {
+            let sessions = (0..<n).map { i -> SessionRecord in
+                let start = cal.startOfDay(cal.addDays(-(i % 28), to: today))!.addingTimeInterval(Double(9 * 3600 + i * 60))
+                let minutes = [25, 45, 80, 15][i % 4]
+                return SessionRecord(id: "demo-\(i)", kind: i % 17 == 5 ? .nsdr : .focus, taskId: nil, taskTitle: nil, category: cats[i % 5],
+                                     preset: "25/5", plannedS: minutes * 60, startedAt: start, endedAt: start.addingTimeInterval(Double(minutes * 60)),
+                                     tz: cal.timeZone.identifier, focusedS: minutes * 60, outcome: i % 9 == 4 ? .stoppedEarly : .completed, pauses: [])
+            }
+            let g = GardenBuilder.build(sessions: sessions, events: [], calendar: cal, now: Date())
+            save("garden-\(n)", IsoPlotView(plot: g.plot(.month, containing: today, calendar: cal), animate: false).frame(width: 340, height: 190).environment(\.theme, t))
+        }
     }
 
     /// Default layout matches the reference image: Today on the left, Focus and Garden stacked on the right.
@@ -83,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else { panels.hide("focus") }
         if settings.showProgress {
-            panels.show("progress", size: CGSize(width: 380, height: 280), origin: CGPoint(x: screen.maxX - 420, y: screen.maxY - 330), floating: settings.floatPanels) {
+            panels.show("progress", size: CGSize(width: 380, height: 300), origin: CGPoint(x: screen.maxX - 420, y: screen.maxY - 330), floating: settings.floatPanels) {
                 Themed { ProgressPanelView() }.environmentObject(model)
             }
         } else { panels.hide("progress") }

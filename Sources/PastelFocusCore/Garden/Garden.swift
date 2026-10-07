@@ -38,7 +38,7 @@ public struct GardenItem: Codable, Sendable, Equatable, Identifiable {
     public var size: PlantSize?
     public var variant: Variant
     public var day: String
-    /// Grid cell on the island (0..<Garden.columns, 0..<Garden.rows).
+    /// Tile on the plot it's shown in (0..<plot.side each way). 0,0 is the back corner.
     public var x: Int
     public var y: Int
 }
@@ -58,35 +58,108 @@ public enum Landmark: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    /// Cells kept free for the landmark so plants never cover it.
-    public var cells: [(Int, Int)] {
+    /// Tiles kept free for the landmark on a plot `side` tiles across, so plants never cover it.
+    /// Anchored to the plot's edges and centre so they stay put (relatively) as the plot grows.
+    public func tiles(side n: Int) -> [GardenTile] {
+        let mid = n / 2
         switch self {
-        case .path: return [(0, 3), (1, 3), (2, 3)]
-        case .pond: return [(9, 4), (10, 4), (9, 5), (10, 5)]
-        case .stoneLantern: return [(5, 1)]
-        case .redBridge: return [(8, 4)]
-        case .smallHouse: return [(2, 0), (3, 0)]
-        case .waterfall: return [(11, 0), (11, 1)]
+        case .path: return (0..<3).map { GardenTile(x: $0, y: n - 1) }
+        case .pond: return [GardenTile(x: n - 2, y: mid), GardenTile(x: n - 1, y: mid), GardenTile(x: n - 2, y: mid + 1), GardenTile(x: n - 1, y: mid + 1)]
+        case .stoneLantern: return [GardenTile(x: mid, y: 1)]
+        case .redBridge: return [GardenTile(x: n - 3, y: mid)]
+        case .smallHouse: return [GardenTile(x: 0, y: 0), GardenTile(x: 1, y: 0)]
+        case .waterfall: return [GardenTile(x: n - 1, y: 0)]
         }
     }
 }
 
-public struct Island: Sendable, Equatable {
-    public var week: String
+public struct GardenTile: Hashable, Sendable {
+    public var x: Int
+    public var y: Int
+    public init(x: Int, y: Int) { self.x = x; self.y = y }
+}
+
+/// Forest-style views of the garden.
+public enum GardenPeriod: String, CaseIterable, Sendable {
+    case day, week, month
+
+    /// Identifies the period a day falls in: "2026-10-07", "2026-W41" or "2026-10".
+    public func key(for day: String, calendar: DayCalendar) -> String {
+        switch self {
+        case .day: return day
+        case .week: return calendar.startOfDay(day).map(calendar.isoWeek) ?? day
+        case .month: return String(day.prefix(7))
+        }
+    }
+
+    /// A day in the period `offset` periods away (negative = earlier).
+    public func shift(_ day: String, by offset: Int, calendar: DayCalendar) -> String {
+        switch self {
+        case .day: return calendar.addDays(offset, to: day)
+        case .week: return calendar.addDays(offset * 7, to: day)
+        case .month:
+            let y = Int(day.prefix(4)) ?? 2000, m = Int(day.dropFirst(5).prefix(2)) ?? 1
+            let total = y * 12 + (m - 1) + offset
+            return String(format: "%04d-%02d-01", total / 12, total % 12 + 1)
+        }
+    }
+}
+
+/// One square, isometric plot of land holding a period's sessions. It grows (and the view zooms
+/// out) as items are added, so it never gets crowded.
+public struct GardenPlot: Sendable, Equatable {
+    public var period: GardenPeriod
+    public var key: String
+    /// Tiles along each edge.
+    public var side: Int
     public var items: [GardenItem]
+    public var landmarks: [Landmark]
+    /// One per task finished in the period.
     public var fireflies: Int
 }
 
 public struct Garden: Sendable, Equatable {
-    public static let columns = 12
-    public static let rows = 6
-
-    public var islands: [Island]
+    /// Every session's item (unplaced; `plot` lays them out).
+    public var items: [GardenItem]
+    /// Tasks finished per day, for fireflies.
+    public var tasksDone: [String: Int]
     public var goodDays: Int
     public var currentRun: Int
     public var landmarks: [Landmark]
 
-    public static let empty = Garden(islands: [], goodDays: 0, currentRun: 0, landmarks: [])
+    public static let empty = Garden(items: [], tasksDone: [:], goodDays: 0, currentRun: 0, landmarks: [])
+
+    /// Smallest plot, and the share of tiles that may be used before it grows.
+    public static let minSide = 4
+    static let maxFill = 0.45
+
+    /// Lays out the period containing `day`. Each item gets a stable spot from its id (as a fraction
+    /// of the plot), so plants keep their relative places as the plot grows.
+    public func plot(_ period: GardenPeriod, containing day: String, calendar: DayCalendar) -> GardenPlot {
+        let key = period.key(for: day, calendar: calendar)
+        let members = items.filter { period.key(for: $0.day, calendar: calendar) == key }
+        let fireflies = tasksDone.filter { period.key(for: $0.key, calendar: calendar) == key }.values.reduce(0, +)
+        let side = Self.side(items: members.count, landmarks: landmarks)
+        var occupied = Set(landmarks.flatMap { $0.tiles(side: side) })
+        var placed: [GardenItem] = []
+        for var item in members {
+            var rng = SeededRandom(seed: stableHash(item.id))
+            for _ in 0..<400 {
+                let tile = GardenTile(x: Int(Double(rng.next() % 10_000) / 10_000 * Double(side)),
+                                      y: Int(Double(rng.next() % 10_000) / 10_000 * Double(side)))
+                if occupied.insert(tile).inserted { item.x = tile.x; item.y = tile.y; placed.append(item); break }
+            }
+        }
+        return GardenPlot(period: period, key: key, side: side, items: placed, landmarks: landmarks, fireflies: fireflies)
+    }
+
+    static func side(items: Int, landmarks: [Landmark]) -> Int {
+        let floor = landmarks.isEmpty ? minSide : 6 // room for landmarks without overlap
+        var n = max(floor, Int(ceil(sqrt(Double(items) / maxFill))))
+        // Landmarks take tiles too; grow until the items fit within the fill limit.
+        while Double(items + Set(landmarks.flatMap { $0.tiles(side: n) }).count) > Double(n * n) * maxFill + 1 { n += 1 }
+        return n
+    }
 }
 
 /// FNV-1a: a stable hash (Swift's Hasher is randomised per launch, so layouts would reshuffle).
@@ -110,35 +183,17 @@ public struct SeededRandom: RandomNumberGenerator {
 }
 
 public enum GardenBuilder {
-    /// Builds every week's island from the logs. Pure function: same logs → same garden.
+    /// Builds the garden from the logs. Pure function: same logs → same garden.
     public static func build(sessions: [SessionRecord], events: [TaskEvent], calendar: DayCalendar, now: Date) -> Garden {
         let rollups = Rollups.build(sessions: sessions, events: events, calendar: calendar)
         let (good, run) = progress(rollups: rollups, calendar: calendar, today: calendar.day(now))
-        let landmarks = Landmark.allCases.filter { good >= $0.goodDays }
-        let reserved = Set(landmarks.flatMap { $0.cells.map { "\($0.0),\($0.1)" } })
-
         // Sort by time, then id, so ties always place in the same order.
         let ordered = sessions.sorted { ($0.startedAt, $0.id) < ($1.startedAt, $1.id) }
-        let byWeek = Dictionary(grouping: ordered, by: { calendar.isoWeek($0.startedAt) })
-        let doneByWeek = Dictionary(grouping: events.filter { $0.type == .completed }, by: { calendar.isoWeek($0.at) })
-        let weeks = Set(byWeek.keys).union(doneByWeek.keys).sorted()
-
-        let islands = weeks.map { week -> Island in
-            var occupied = reserved
-            var items: [GardenItem] = []
-            for s in byWeek[week] ?? [] {
-                guard var item = item(for: s, events: events, now: now, calendar: calendar) else { continue }
-                var rng = SeededRandom(seed: stableHash(s.id))
-                var placed = false
-                for _ in 0..<200 {
-                    let x = Int.random(in: 0..<Garden.columns, using: &rng), y = Int.random(in: 0..<Garden.rows, using: &rng)
-                    if occupied.insert("\(x),\(y)").inserted { item.x = x; item.y = y; placed = true; break }
-                }
-                if placed { items.append(item) } // a full island simply stops growing
-            }
-            return Island(week: week, items: items, fireflies: doneByWeek[week]?.count ?? 0)
-        }
-        return Garden(islands: islands, goodDays: good, currentRun: run, landmarks: landmarks)
+        let items = ordered.compactMap { item(for: $0, events: events, now: now, calendar: calendar) }
+        var done: [String: Int] = [:]
+        for e in events where e.type == .completed { done[calendar.day(e.at), default: 0] += 1 }
+        return Garden(items: items, tasksDone: done, goodDays: good, currentRun: run,
+                      landmarks: Landmark.allCases.filter { good >= $0.goodDays })
     }
 
     static func item(for s: SessionRecord, events: [TaskEvent], now: Date, calendar: DayCalendar) -> GardenItem? {
