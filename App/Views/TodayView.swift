@@ -9,9 +9,6 @@ struct TodayView: View {
     @State private var newText = ""
     @FocusState private var fieldFocused: Bool
 
-    private static let quotes = ["A calm mind does beautiful things.", "Small steps, every day.", "One thing at a time.",
-                                 "Good things take time.", "Rest is part of the work."]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
@@ -29,11 +26,7 @@ struct TodayView: View {
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                PanelTitle("Today")
-                Text("“\(Self.quotes[Calendar.current.component(.day, from: Date()) % Self.quotes.count])”")
-                    .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
-            }
+            PanelTitle("Today")
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 Text(Date.now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
