@@ -161,7 +161,7 @@ struct TaskRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Checkbox(checked: done) { model.toggle(task) }
+            Checkbox(checked: done) { model.toggle(task) }.padding(-6) // bigger target, same layout
             SpriteView(rows: Sprite.forCategory(task.category), px: 2).opacity(done ? 0.5 : 1)
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title).font(.system(size: 15, weight: .semibold))
@@ -218,6 +218,10 @@ struct Checkbox: View {
             }
             .frame(width: 20, height: 20)
             .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.7), value: checked)
+            // An unchecked box is only an outline with a clear fill, so without this just the 1.5 pt
+            // border took clicks. Pad the target too: a 20 pt box is small to hit.
+            .frame(width: 32, height: 32)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(checked ? "Mark not done" : "Mark done")
