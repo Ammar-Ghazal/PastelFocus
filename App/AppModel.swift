@@ -52,7 +52,6 @@ final class AppModel: ObservableObject {
     @Published var toast: UndoToast?
     @Published var problemsCount = 0
     @Published var todayFocusedMin = 0
-    @Published var sessionsToday: [SessionRecord] = []
     @Published var hermesCard: (TaskItem, Int, String?)? = nil
     /// The theme on screen: the user's choice, matched to macOS light/dark if they asked for that.
     @Published private(set) var theme = Theme.standard
@@ -177,8 +176,6 @@ final class AppModel: ObservableObject {
         cycleIndex = c.engine.cycleIndex
         insights = c.insights
         garden = c.garden()
-        let all = c.recorder.log.readAll()
-        sessionsToday = all.filter { c.calendar.day($0.startedAt) == c.today }
         // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
         todayFocusedMin = c.todayTotals().rollup.focusedS / 60
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {

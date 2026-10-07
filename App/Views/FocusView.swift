@@ -46,11 +46,10 @@ struct FocusView: View {
                 }
                 Spacer(minLength: 0)
             }
-            gardenRow
         }
         .padding(PanelStyle.padding)
         // Top-aligned: centring in the fixed height left a bigger gap above the title than the other panels.
-        .frame(width: 300, height: 230, alignment: .topLeading)
+        .frame(width: 300, height: 200, alignment: .topLeading)
         .background(GlassBackground(radius: 18))
         .onHover { hover = $0 }
         .overlay { cards }
@@ -158,17 +157,6 @@ struct FocusView: View {
             }.disabled(model.phase != .idle)
         } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 24)
-    }
-
-    /// Today's sessions as a row of tiny plants (grown or wilted).
-    private var gardenRow: some View {
-        HStack(spacing: 2) {
-            ForEach(model.sessionsToday.filter { $0.kind == .focus }.suffix(14)) { s in
-                SpriteView(rows: s.outcome == .completed ? Sprite.forCategory(s.category) : Sprite.wilted, px: 1.5)
-            }
-            Spacer()
-        }
-        .frame(height: 12)
     }
 
     @ViewBuilder private var cards: some View {
