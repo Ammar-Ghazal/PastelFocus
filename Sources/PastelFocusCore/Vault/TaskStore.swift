@@ -219,6 +219,22 @@ public final class TaskStore {
         }
     }
 
+    /// Replaces the tag `#old` with `#new` on one task line (whole tags only: renaming `#code`
+    /// leaves `#coding` alone). Case-insensitive.
+    public func renameTag(_ id: String, from old: String, to new: String, actor: Actor) throws {
+        let now = clock.now()
+        let pattern = try NSRegularExpression(pattern: "(?<![\\w#])#" + NSRegularExpression.escapedPattern(for: old) + "(?![\\w/-])",
+                                              options: .caseInsensitive)
+        try mutate(id, actor: actor) { t in
+            let ns = t.description as NSString
+            let replaced = pattern.stringByReplacingMatches(in: t.description, range: NSRange(location: 0, length: ns.length),
+                                                            withTemplate: NSRegularExpression.escapedTemplate(for: "#" + new))
+            guard replaced != t.description else { return [] }
+            t.description = replaced
+            return [TaskEvent(at: now, taskId: id, type: .edited, field: "tags", old: "#\(old)", new: "#\(new)", actor: actor)]
+        }
+    }
+
     /// Sets `[sessions:: n]` to the number of completed focus sessions linked to the task.
     public func setActualSessions(_ id: String, _ n: Int) throws {
         try mutate(id, actor: .app) { t in

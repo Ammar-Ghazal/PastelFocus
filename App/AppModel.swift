@@ -47,6 +47,8 @@ final class AppModel: ObservableObject {
     @Published var suggestion: Suggestion?
     @Published var lastEnded: SessionRecord?
     @Published var garden: Garden = .empty
+    /// Tags and the plant slot each grows (PastelFocus/Tags.md).
+    @Published var tags = TagRegistry()
     @Published var insights: [Insight] = []
     @Published var toast: UndoToast?
     @Published var problemsCount = 0
@@ -179,6 +181,7 @@ final class AppModel: ObservableObject {
         activeKind = c.engine.active?.kind
         insights = c.insights
         garden = c.garden()
+        tags = c.tagRegistry
         // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
         todayFocusedMin = c.todayTotals().rollup.focusedS / 60
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
@@ -201,6 +204,21 @@ final class AppModel: ObservableObject {
 
     /// The first unfinished high-priority task gets the highlighted row.
     var highlightedID: String? { tasks.first { $0.status.isOpen && $0.priority == .high }?.taskID }
+
+    // MARK: Tags
+
+    /// Resolves tags to plants in the current theme (shared with the views through the environment).
+    var plantArt: PlantArt { PlantArt(registry: tags, theme: theme.definition.id) }
+
+    /// How many of all scanned tasks (any day) carry each tag.
+    func taskCount(tagged name: String) -> Int { coordinator.tasks(tagged: name).count }
+
+    /// Runs a tag change, refreshes, and shows the error (if any) as a toast. Returns success.
+    @discardableResult
+    func changeTags(_ change: (Coordinator) throws -> Void) -> Bool {
+        do { try change(coordinator); publish(); return true }
+        catch { toast = UndoToast(text: "\(error)", undo: {}); return false }
+    }
 
     // MARK: Task actions
 
@@ -450,7 +468,7 @@ final class AppModel: ObservableObject {
     func savePostcard(_ period: GardenPeriod = .month, containing day: String? = nil) {
         let plot = garden.plot(period, containing: day ?? coordinator.today, calendar: coordinator.calendar)
         let m = plot.key
-        let view = PostcardView(title: m, plot: plot, garden: garden).environment(\.theme, theme)
+        let view = PostcardView(title: m, plot: plot, garden: garden).environment(\.theme, theme).environment(\.plantArt, plantArt)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

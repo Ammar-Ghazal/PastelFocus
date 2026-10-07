@@ -98,9 +98,10 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
 
     public var tags: [String] { TaskLineParser.tags(in: description) }
 
-    /// First known category tag, e.g. "career".
+    /// The first tag on the line (lowercased), skipping `#later`, which marks priority. It decides
+    /// the plant a session grows and is the category used in analytics.
     public var category: String? {
-        tags.map { $0.lowercased() }.first { Categories.known.contains($0) } ?? tags.first?.lowercased()
+        tags.map { $0.lowercased() }.first { !TagRegistry.reserved.contains($0) }
     }
 
     public var isLater: Bool { tags.contains { $0.lowercased() == "later" } }
@@ -119,6 +120,3 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     }
 }
 
-public enum Categories {
-    public static let known: [String] = ["career", "coding", "learning", "health", "personal", "focus", "later"]
-}

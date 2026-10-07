@@ -25,7 +25,7 @@ final class GardenTests: XCTestCase {
         XCTAssertEqual(items["b"]?.variant, .glowing)
         XCTAssertEqual(items["c"]?.variant, .normal)
         XCTAssertEqual(items["d"]?.variant, .golden)
-        XCTAssertEqual(items["d"]?.species, .crystalPine)
+        XCTAssertEqual(items["d"]?.tag, "coding")
         XCTAssertEqual(items["d"]?.size, .large)
         XCTAssertEqual(items["e"]?.kind, .wilted, "stopped within the last day")
         XCTAssertEqual(items["f"]?.kind, .richSoil, "older wilted sprouts become soil")
