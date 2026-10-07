@@ -84,7 +84,7 @@ struct TodayWidgetView: View {
         let rows = Array(s.tasks.prefix(family == .systemLarge || family == .systemExtraLarge ? 6 : 3))
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("✦ Today").font(t.titleFont(17)).foregroundStyle(t.accent)
+                Text("Today").font(t.titleFont(17, .semibold)).foregroundStyle(t.accent)
                 Spacer()
                 Text("\(s.doneCount)/\(s.totalCount)").font(.system(size: 12, weight: .semibold)).foregroundStyle(t.textSecondary)
             }
@@ -128,7 +128,7 @@ struct FocusWidgetView: View {
         let s = entry.snapshot
         let t = s.themed
         VStack(alignment: .leading, spacing: 6) {
-            Text("◎ Focus").font(t.titleFont(15, .semibold)).foregroundStyle(t.accent)
+            Text("Focus").font(t.titleFont(17, .semibold)).foregroundStyle(t.accent)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     if let start = s.timerStart, s.phase == .running {

@@ -10,6 +10,22 @@ extension EnvironmentValues {
     }
 }
 
+/// Shared header and spacing for the desktop panels, so Today, Focus and Night Garden line up.
+enum PanelStyle {
+    static let padding: CGFloat = 20
+    static let titleSize: CGFloat = 20
+}
+
+/// A panel's title, styled the same in every panel.
+struct PanelTitle: View {
+    @Environment(\.theme) var theme
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).font(theme.titleFont(PanelStyle.titleSize, .semibold)).foregroundStyle(theme.accent)
+    }
+}
+
 /// Panel background: system blur, the palette's glass tint, the theme's scene art (and ambient
 /// motion when allowed), a hairline border and a drag area.
 struct GlassBackground: View {

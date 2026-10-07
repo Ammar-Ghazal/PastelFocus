@@ -25,8 +25,6 @@ enum Sprite {
     static let house = ["....rr........", "...rRRr.......", "..rRRRRr......", ".rRRRRRRr.....", "rRRRRRRRRr....", ".TYTTTTYT.....", ".TYTTTTYT.....", ".TTTDDTTT....."]
     static let bridge = ["........", "........", ".RRRRRR.", "R.R..R.R", "R......R", "........", "........", "........"]
     static let catMascot = ["P......P", "PP....PP", "PLLLLLLP", "LKLLLLKL", "LLLppLLL", ".LLLLLL.", "..L..L..", "........"]
-    static let target = ["..PPPP..", ".P....P.", "P..PP..P", "P.PLLP.P", "P.PLLP.P", "P..PP..P", ".P....P.", "..PPPP.."]
-    static let sparkle = ["...L....", "...L....", ".LLPLL..", "...L....", "...L....", "........", "........", "........"]
 
     static func forItem(_ item: GardenItem) -> [String] {
         switch item.kind {
