@@ -92,6 +92,9 @@ struct ThemeCard: View {
                 .background(t.surface)
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            // The scene art ignores hits (so it never steals clicks elsewhere); without this only the
+            // name pill and the swatch bar were clickable.
+            .contentShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(selected ? t.accent : Color.secondary.opacity(hover ? 0.5 : 0.2), lineWidth: selected ? 2.5 : 1))
             .scaleEffect(hover ? 1.02 : 1)
             .animation(.easeOut(duration: 0.12), value: hover)
@@ -131,6 +134,7 @@ struct PaletteChip: View {
             .padding(9)
             .background(LinearGradient(colors: [t.sceneTop, t.sceneBottom], startPoint: .top, endPoint: .bottom))
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? t.accent : t.border, lineWidth: selected ? 2.5 : 1))
             .overlay(alignment: .topTrailing) {
                 if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(t.accent, t.onAccent).padding(4) }
