@@ -8,6 +8,11 @@ struct TodayView: View {
     @State private var adding = false
     @State private var newText = ""
     @FocusState private var fieldFocused: Bool
+    @State private var grabberHover = false
+
+    static let defaultHeight: CGFloat = 690
+    /// The panel's height can be dragged within this range (the width is fixed); the list scrolls.
+    static let heightRange: ClosedRange<CGFloat> = 360...900
 
     private static let quotes = ["A calm mind does beautiful things.", "Small steps, every day.", "One thing at a time.",
                                  "Good things take time.", "Rest is part of the work."]
@@ -22,9 +27,22 @@ struct TodayView: View {
             footer
         }
         .padding(PanelStyle.padding)
-        .frame(width: 560, height: 690, alignment: .topLeading)
+        .frame(width: 560, alignment: .topLeading)
+        .frame(minHeight: Self.heightRange.lowerBound, maxHeight: .infinity, alignment: .top)
         .background(GlassBackground(sceneOpacity: 0.28))
         .overlay(alignment: .bottom) { ToastView().padding(.bottom, 12) }
+        .overlay(alignment: .bottom) { if !snapshot { resizeGrabber } }
+    }
+
+    /// Drag to change the panel's height. A faint bar that brightens on hover.
+    private var resizeGrabber: some View {
+        ZStack {
+            Capsule().fill(theme.textTertiary.opacity(grabberHover ? 0.8 : 0.3)).frame(width: 40, height: 4)
+            PanelResizeHandle()
+        }
+        .frame(maxWidth: .infinity).frame(height: 12)
+        .onHover { grabberHover = $0 }
+        .help("Drag to resize")
     }
 
     private var header: some View {
@@ -104,6 +122,7 @@ struct TodayView: View {
                 ForEach(model.filteredTasks.prefix(7)) { t in TaskRow(task: t, highlighted: t.taskID == model.highlightedID) }
                 Spacer(minLength: 0)
             }
+            .frame(minHeight: 0, maxHeight: .infinity, alignment: .top).clipped() // shrinks like the scroll view
         } else {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 4) {

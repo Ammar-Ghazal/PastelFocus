@@ -131,11 +131,45 @@ struct WindowDragArea: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
+/// Grab strip along a panel's bottom edge: drag to change the height, keeping the top edge where it is.
+/// Borderless panels get no resize edges from macOS, so this does it by hand.
+struct PanelResizeHandle: NSViewRepresentable {
+    final class HandleView: NSView {
+        private var startMouseY: CGFloat = 0
+        private var startFrame: NSRect = .zero
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override var mouseDownCanMoveWindow: Bool { false } // resize, don't move
+        override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeUpDown) }
+
+        override func mouseDown(with event: NSEvent) {
+            startMouseY = NSEvent.mouseLocation.y
+            startFrame = window?.frame ?? .zero
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let w = window else { return }
+            let wanted = startFrame.height + (startMouseY - NSEvent.mouseLocation.y) // dragging down makes it taller
+            let height = min(w.contentMaxSize.height, max(w.contentMinSize.height, wanted.rounded()))
+            var f = startFrame
+            f.origin.y = startFrame.maxY - height
+            f.size.height = height
+            w.setFrame(f, display: true)
+        }
+    }
+
+    func makeNSView(context: Context) -> HandleView { HandleView() }
+    func updateNSView(_ nsView: HandleView, context: Context) {}
+}
+
 @MainActor
 final class PanelController {
     private(set) var panels: [String: DesktopPanel] = [:]
 
-    func show<Content: View>(_ name: String, size: CGSize, origin: CGPoint, floating: Bool, @ViewBuilder content: () -> Content) {
+    /// `heightRange`: lets the user drag the panel's height within the range (see `PanelResizeHandle`);
+    /// the height they chose is remembered. Without it the panel always has `size`.
+    func show<Content: View>(_ name: String, size: CGSize, origin: CGPoint, floating: Bool, heightRange: ClosedRange<CGFloat>? = nil,
+                             @ViewBuilder content: () -> Content) {
         if let p = panels[name] { p.orderFrontRegardless(); apply(floating: floating, to: p); return }
         let panel = DesktopPanel(contentRect: NSRect(origin: origin, size: size),
                                  styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView], backing: .buffered, defer: false)
@@ -152,7 +186,19 @@ final class PanelController {
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host
         panel.setFrameAutosaveName("PastelFocus.\(name)")
-        panel.setContentSize(size) // a remembered frame keeps its position, never an outdated size
+        if let range = heightRange {
+            // Keep the remembered height (clamped) and the top edge; the width is fixed.
+            host.sizingOptions = []
+            panel.contentMinSize = CGSize(width: size.width, height: range.lowerBound)
+            panel.contentMaxSize = CGSize(width: size.width, height: range.upperBound)
+            var frame = panel.frame
+            let height = min(range.upperBound, max(range.lowerBound, frame.height))
+            frame.origin.y += frame.height - height
+            frame.size = CGSize(width: size.width, height: height)
+            panel.setFrame(frame, display: false)
+        } else {
+            panel.setContentSize(size) // a remembered frame keeps its position, never an outdated size
+        }
         apply(floating: floating, to: panel)
         panel.orderFrontRegardless()
         panels[name] = panel
