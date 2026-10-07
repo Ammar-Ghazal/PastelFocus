@@ -55,12 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for def_ in ThemeCatalog.all {
             for p in [def_.palettes.first { $0.isDark }, def_.palettes.first { !$0.isDark }].compactMap({ $0 }) {
                 let t = Theme(def_, p), tag = "\(def_.id)-\(p.isDark ? "dark" : "light")"
-                save("theme-\(tag)-today", TodayView().environment(\.theme, t))
+                save("theme-\(tag)-today", TodayView().frame(height: TodayView.defaultHeight).environment(\.theme, t))
                 save("theme-\(tag)-focus", FocusView().environment(\.theme, t))
                 save("theme-\(tag)-garden", ProgressPanelView().environment(\.theme, t))
             }
         }
         let t = model.theme
+        save("today-min-height", TodayView().frame(height: TodayView.heightRange.lowerBound).environment(\.theme, t))
         save("dial-idle", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))
         save("dial-stopwatch", TimerDial(minutes: 25, progress: 0.3, clock: "18:05", caption: "elapsed", onCommit: { _ in }, editable: false).padding(10).environment(\.theme, t))
         let demo = AppSettings()
@@ -87,7 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showPanels() {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         if settings.showToday {
-            panels.show("today", size: CGSize(width: 560, height: 690), origin: CGPoint(x: screen.minX + 260, y: screen.maxY - 760), floating: settings.floatPanels) {
+            panels.show("today", size: CGSize(width: 560, height: TodayView.defaultHeight), origin: CGPoint(x: screen.minX + 260, y: screen.maxY - 760),
+                        floating: settings.floatPanels, heightRange: TodayView.heightRange) {
                 Themed { TodayView() }.environmentObject(model)
             }
         } else { panels.hide("today") }
