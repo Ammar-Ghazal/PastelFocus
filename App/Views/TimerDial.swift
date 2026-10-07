@@ -19,6 +19,8 @@ struct TimerDial: View {
     /// False in stopwatch mode: there's no length to set.
     var editable = true
 
+    /// Value under the finger. Kept after release until `minutes` catches up: the model publishes the new
+    /// length a run-loop later, and clearing this early flashed the old value before jumping to the new one.
     @State private var dragMinutes: Int?
     @FocusState private var focused: Bool
 
@@ -34,15 +36,17 @@ struct TimerDial: View {
         ZStack {
             Circle().stroke(theme.track, lineWidth: line)
             ticks
-            Circle()
-                .trim(from: 0, to: fill)
-                .stroke(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .top, endPoint: .bottom),
-                        style: StrokeStyle(lineWidth: line, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                // Ease only when the length is changed on the dial; a running ring moves a hair per
-                // second, and animating that every second cost ~3% CPU for no visible benefit.
-                .animation(progress == nil && dragMinutes == nil && !reduceMotion ? .easeOut(duration: 0.2) : nil, value: fill)
-            if interactive { knob }
+            ZStack {
+                Circle()
+                    .trim(from: 0, to: fill)
+                    .stroke(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .top, endPoint: .bottom),
+                            style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                if interactive { knob }
+            }
+            // Glide between 5-minute steps while dragging (ring and knob move together along the arc).
+            // A running ring moves a hair per second and isn't animated: that cost ~3% CPU for nothing.
+            .animation(progress == nil && !reduceMotion ? .interactiveSpring(response: 0.16, dampingFraction: 0.9) : nil, value: fill)
             VStack(spacing: 0) {
                 Text(interactive ? String(format: "%d:00", shown) : clock)
                     .font(.system(size: interactive || clock.count <= 5 ? 24 : 19, weight: .medium, design: .monospaced))
@@ -52,6 +56,8 @@ struct TimerDial: View {
             }
         }
         .frame(width: size, height: size)
+        .onChange(of: minutes) { dragMinutes = nil }
+        .onChange(of: interactive) { dragMinutes = nil }
         .padding(Self.hitSlop)
         .contentShape(Circle())
         .gesture(drag, including: interactive ? .all : .subviews)
@@ -87,8 +93,8 @@ struct TimerDial: View {
                 }
             }
             .onEnded { _ in
-                if let m = dragMinutes { onCommit(m) }
-                dragMinutes = nil
+                guard let m = dragMinutes else { return }
+                if m == minutes { dragMinutes = nil } else { onCommit(m) } // cleared once `minutes` arrives
             }
     }
 
@@ -102,12 +108,12 @@ struct TimerDial: View {
     }
 
     private var knob: some View {
-        let angle = DialMath.fraction(shown) * 2 * .pi
-        let r = size / 2
-        return Circle().fill(theme.accentLight)
+        // Rotated rather than offset so an animated change travels along the ring, not across it.
+        Circle().fill(theme.accentLight)
             .overlay(Circle().strokeBorder(theme.accentStrong, lineWidth: 2))
             .frame(width: 15, height: 15)
-            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-            .offset(x: r * sin(angle), y: -r * cos(angle))
+            .offset(y: -size / 2)
+            .rotationEffect(.degrees(DialMath.fraction(shown) * 360))
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1) // after rotating, so it always falls downward
     }
 }
