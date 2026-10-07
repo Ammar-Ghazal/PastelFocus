@@ -26,6 +26,9 @@ struct TimerDial: View {
     private var shown: Int { dragMinutes ?? minutes }
     private var fill: Double { progress ?? (editable ? DialMath.fraction(shown) : 0) }
     private let line: CGFloat = 7
+    /// How far the grab target reaches past the ring. The knob sits half outside the dial, and a click
+    /// that just missed the ring used to fall through to the panel and move the window instead.
+    static let hitSlop: CGFloat = 16
 
     var body: some View {
         ZStack {
@@ -49,8 +52,10 @@ struct TimerDial: View {
             }
         }
         .frame(width: size, height: size)
+        .padding(Self.hitSlop)
         .contentShape(Circle())
         .gesture(drag, including: interactive ? .all : .subviews)
+        .padding(-Self.hitSlop) // keeps the layout size; only the hit area grows
         .focusable(interactive)
         .focusEffectDisabled()
         .focused($focused)
@@ -73,7 +78,8 @@ struct TimerDial: View {
     private var drag: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
-                let raw = DialMath.minutes(dx: v.location.x - size / 2, dy: v.location.y - size / 2)
+                let centre = size / 2 + Self.hitSlop
+                let raw = DialMath.minutes(dx: v.location.x - centre, dy: v.location.y - centre)
                 let next = DialMath.continuing(from: dragMinutes ?? minutes, to: raw)
                 if next != dragMinutes {
                     dragMinutes = next
