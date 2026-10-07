@@ -133,16 +133,16 @@ struct FocusWidgetView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if let start = s.timerStart, s.phase == .running {
                         Text(start, style: .timer) // counts up by itself
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accent : t.textPrimary)
                     } else if let elapsed = s.elapsedS {
                         Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accent : t.textPrimary)
                     } else if let end = s.timerEnd, s.phase == .running || s.phase == .resting, end > entry.date {
                         Text(timerInterval: entry.date...end, countsDown: true)
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accent : t.textPrimary)
                     } else {
                         Text(String(format: "%02d:%02d", s.remainingS / 60, s.remainingS % 60))
-                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accentLight : t.textPrimary)
+                            .font(.system(size: 30, weight: .medium, design: .monospaced)).foregroundStyle(t.isNight ? t.accent : t.textPrimary)
                     }
                     Text(s.phase == .paused ? "Paused" : s.timerTitle).font(.system(size: 12)).foregroundStyle(t.textSecondary).lineLimit(1)
                 }

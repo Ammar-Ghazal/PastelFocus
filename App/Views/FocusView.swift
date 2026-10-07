@@ -133,8 +133,8 @@ struct FocusView: View {
             Image(systemName: model.phase == .running || model.phase == .resting ? "pause.fill" : "play.fill")
                 .font(.system(size: 20, weight: .bold)).foregroundStyle(theme.onAccent)
                 .frame(width: 52, height: 52)
-                .background(Circle().fill(theme.accentStrong))
-                .background { if !snapshot { BreathingGlow(color: NSColor(theme.accentStrong), active: breathe).frame(width: 80, height: 80) } }
+                .background(Circle().fill(theme.accent))
+                .background { if !snapshot { BreathingGlow(color: NSColor(theme.accent), active: breathe).frame(width: 80, height: 80) } }
         }
         .buttonStyle(PressableStyle())
         .help("Start or pause (⌥⌘F)")

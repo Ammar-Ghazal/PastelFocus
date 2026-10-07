@@ -39,8 +39,7 @@ struct TimerDial: View {
             ZStack {
                 Circle()
                     .trim(from: 0, to: fill)
-                    .stroke(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .top, endPoint: .bottom),
-                            style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .stroke(theme.accent, style: StrokeStyle(lineWidth: line, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 if interactive { knob }
             }
@@ -51,7 +50,7 @@ struct TimerDial: View {
                 Text(interactive ? String(format: "%d:00", shown) : clock)
                     .font(.system(size: interactive || clock.count <= 5 ? 24 : 19, weight: .medium, design: .monospaced))
                     .monospacedDigit()
-                    .foregroundStyle(theme.isNight ? theme.accentLight : theme.textPrimary)
+                    .foregroundStyle(theme.isNight ? theme.accent : theme.textPrimary)
                 Text(caption).font(.system(size: 10, weight: .medium)).foregroundStyle(theme.textSecondary)
             }
         }
@@ -109,8 +108,9 @@ struct TimerDial: View {
 
     private var knob: some View {
         // Rotated rather than offset so an animated change travels along the ring, not across it.
-        Circle().fill(theme.accentLight)
-            .overlay(Circle().strokeBorder(theme.accentStrong, lineWidth: 2))
+        // Same accent as the ring, outlined in the panel colour so it stands out against it.
+        Circle().fill(theme.accent)
+            .overlay(Circle().strokeBorder(theme.surface, lineWidth: 2.5))
             .frame(width: 15, height: 15)
             .offset(y: -size / 2)
             .rotationEffect(.degrees(DialMath.fraction(shown) * 360))

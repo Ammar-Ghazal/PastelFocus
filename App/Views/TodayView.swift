@@ -62,7 +62,7 @@ struct TodayView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 16).frame(height: 34)
                     .foregroundStyle(active ? theme.onAccent : theme.textSecondary)
-                    .background(Capsule().fill(active ? AnyShapeStyle(LinearGradient(colors: [theme.accentLight, theme.accent], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(theme.elevated)))
+                    .background(Capsule().fill(active ? AnyShapeStyle(theme.accent) : AnyShapeStyle(theme.elevated)))
                 }
                 .buttonStyle(.plain)
             }
@@ -132,7 +132,7 @@ struct TodayView: View {
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4).fill(theme.track)
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(LinearGradient(colors: [theme.accent, theme.accentLight], startPoint: .leading, endPoint: .trailing))
+                            .fill(theme.accent)
                             .frame(width: g.size.width * fraction)
                             .animation(.spring(response: 0.45), value: fraction)
                     }
@@ -213,7 +213,7 @@ struct Checkbox: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 5).strokeBorder(theme.textTertiary, lineWidth: 1.5)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(checked ? theme.accentLight : .clear))
+                    .background(RoundedRectangle(cornerRadius: 5).fill(checked ? theme.accent : .clear))
                 if checked { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.onAccent) }
             }
             .frame(width: 20, height: 20)
