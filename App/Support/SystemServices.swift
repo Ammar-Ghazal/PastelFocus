@@ -146,7 +146,9 @@ final class PanelController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        let host = FirstMouseHostingView(rootView: content())
+        // Panels are mouse-first: with macOS keyboard navigation on, a clicked button would otherwise
+        // keep a focus ring until focus moved elsewhere.
+        let host = FirstMouseHostingView(rootView: content().focusEffectDisabled())
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host
         panel.setFrameAutosaveName("PastelFocus.\(name)")
