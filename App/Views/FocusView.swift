@@ -365,7 +365,7 @@ struct ProgressPanelView: View {
 
     private var progressText: String {
         let g = model.garden
-        return "\(g.goodDays) good day\(g.goodDays == 1 ? "" : "s") · \(g.currentRun)-day streak"
+        return "\(g.goodDays) good day\(g.goodDays == 1 ? "" : "s") · \(g.currentRun) day streak"
     }
 
     private func count(_ plot: GardenPlot) -> String {
