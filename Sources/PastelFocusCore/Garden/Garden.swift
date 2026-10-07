@@ -202,9 +202,10 @@ public struct SeededRandom: RandomNumberGenerator {
 
 public enum GardenBuilder {
     /// Builds the garden from the logs. Pure function: same logs → same garden.
-    public static func build(sessions: [SessionRecord], events: [TaskEvent], calendar: DayCalendar, now: Date) -> Garden {
+    public static func build(sessions: [SessionRecord], events: [TaskEvent], calendar: DayCalendar, now: Date,
+                             goodDayMinutes: Int = GoodDay.defaultMinutes) -> Garden {
         let rollups = Rollups.build(sessions: sessions, events: events, calendar: calendar)
-        let (good, run) = progress(rollups: rollups, calendar: calendar, today: calendar.day(now))
+        let (good, run) = progress(rollups: rollups, calendar: calendar, today: calendar.day(now), goodDayMinutes: goodDayMinutes)
         // Sort by time, then id, so ties always place in the same order.
         let ordered = sessions.sorted { ($0.startedAt, $0.id) < ($1.startedAt, $1.id) }
         let items = ordered.compactMap { item(for: $0, events: events, now: now, calendar: calendar) }
@@ -239,13 +240,14 @@ public enum GardenBuilder {
 
     /// Good days unlock landmarks and never reset. The current run allows one missed day per ISO week;
     /// a second miss ends the run (progress pauses, it is not lost).
-    static func progress(rollups: [String: DailyRollup], calendar: DayCalendar, today: String) -> (goodDays: Int, run: Int) {
-        let good = rollups.values.filter(\.isGoodDay).map(\.day).sorted()
+    static func progress(rollups: [String: DailyRollup], calendar: DayCalendar, today: String,
+                         goodDayMinutes: Int = GoodDay.defaultMinutes) -> (goodDays: Int, run: Int) {
+        let good = rollups.values.filter { $0.isGoodDay(minFocusedMinutes: goodDayMinutes) }.map(\.day).sorted()
         guard let first = good.first else { return (0, 0) }
         var run = 0, day = first
         var missesInWeek: [String: Int] = [:]
         while day <= today {
-            if rollups[day]?.isGoodDay == true {
+            if rollups[day]?.isGoodDay(minFocusedMinutes: goodDayMinutes) == true {
                 run += 1
             } else if day < today {
                 let week = calendar.isoWeek(calendar.startOfDay(day)!)

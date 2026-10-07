@@ -68,6 +68,7 @@ final class AppModel: ObservableObject {
     init(settings: AppSettings) {
         self.settings = settings
         coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, preset: settings.preset)
+        coordinator.goodDayMinutes = settings.goodDayMinutes
         coordinator.inbox.actions = self
         notifier.onAction = { [weak self] action, info in self?.handleNotification(action, info: info) }
         if AppSettings.devName == nil { hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) }) }
@@ -80,6 +81,9 @@ final class AppModel: ObservableObject {
             MainActor.assumeIsolated { self?.applyTheme() }
         }
         settings.$focusMinutes.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.coordinator.engine.preset = settings.preset; self?.publish() } }.store(in: &bag)
+        // A new good-day threshold changes the streak, landmarks and the Stats files Hermes reads.
+        settings.$goodDayMinutes.dropFirst().removeDuplicates().debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] m in self?.coordinator.goodDayMinutes = m; self?.runNightly() }.store(in: &bag)
         settings.$logsInVault.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         settings.$vaultPath.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         start()
@@ -124,6 +128,7 @@ final class AppModel: ObservableObject {
     func rebuildCoordinator() {
         coordinator.writeNow(appRunning: false)
         coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, preset: settings.preset)
+        coordinator.goodDayMinutes = settings.goodDayMinutes
         coordinator.inbox.actions = self
         start()
     }

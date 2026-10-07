@@ -41,13 +41,15 @@ final class AppSettings: ObservableObject {
     @Published var stopwatchMode: Bool { didSet { d.set(stopwatchMode, forKey: "stopwatchMode") } }
     /// Custom stop-early reasons the user chose to keep (already shortened).
     @Published var savedReasons: [String] { didSet { d.set(savedReasons, forKey: "savedReasons") } }
+    /// Focused minutes in a day that make it a good day (Night Garden streak and landmarks).
+    @Published var goodDayMinutes: Int { didSet { d.set(goodDayMinutes, forKey: "goodDayMinutes") } }
 
     init() {
         d.register(defaults: [
             "vaultPath": FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Obsidian Vault").path,
             "dailyFolder": "Learning Library/Career/Daily Plans",
             "logsInVault": true, "allowHermesStart": false, "floatPanels": false,
-            "focusMinutes": 25, "matchSystemAppearance": false, "ambientMotion": true,
+            "focusMinutes": 25, "goodDayMinutes": GoodDay.defaultMinutes, "matchSystemAppearance": false, "ambientMotion": true,
             "nsdrAudio": "", "launchAtLogin": true, "showToday": true, "showFocus": true, "showProgress": true,
         ])
         vaultPath = d.string(forKey: "vaultPath")!
@@ -63,6 +65,7 @@ final class AppSettings: ObservableObject {
         }
         d.removeObject(forKey: "presetName")
         focusMinutes = DialMath.clamp(d.integer(forKey: "focusMinutes"))
+        goodDayMinutes = min(GoodDay.range.upperBound, max(GoodDay.range.lowerBound, d.integer(forKey: "goodDayMinutes")))
         // Migrate the old Night / Day / System choice.
         if let old = d.string(forKey: "themeMode") {
             let fallback = ThemeSelection.default

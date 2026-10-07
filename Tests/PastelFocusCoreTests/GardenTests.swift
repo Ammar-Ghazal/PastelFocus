@@ -34,7 +34,7 @@ final class GardenTests: XCTestCase {
 
     func testLayoutIsStableAndNonOverlapping() {
         var s = (0..<40).map { focus("s\($0)", day: 26 + $0 % 5) }
-        for d in 1...7 { s += [focus("g\(d)a", day: d), focus("g\(d)b", day: d)] } // 7 good days: 3 landmarks
+        for d in 1...7 { s += [focus("g\(d)a", day: d, minutes: 90), focus("g\(d)b", day: d, minutes: 90)] } // 7 good days: 3 landmarks
         let a = GardenBuilder.build(sessions: s, events: [], calendar: dubai, now: now)
         let b = GardenBuilder.build(sessions: s.shuffled(), events: [], calendar: dubai, now: now)
         XCTAssertEqual(a, b)
@@ -99,7 +99,7 @@ final class GardenTests: XCTestCase {
     func testLandmarksUnlockWithGoodDaysAndRunAllowsOneMissPerWeek() {
         // Good days Oct 19–25 except a single miss on Oct 22 (same ISO week).
         var s: [SessionRecord] = []
-        for d in [19, 20, 21, 23, 24, 25] { s += [focus("x\(d)a", day: d), focus("x\(d)b", day: d)] }
+        for d in [19, 20, 21, 23, 24, 25] { s += [focus("x\(d)a", day: d, minutes: 90), focus("x\(d)b", day: d, minutes: 90)] }
         let g = GardenBuilder.build(sessions: s, events: [], calendar: dubai, now: ISO8601.date("2026-10-25T18:00:00Z")!)
         XCTAssertEqual(g.goodDays, 6)
         XCTAssertEqual(g.currentRun, 6)
@@ -108,6 +108,24 @@ final class GardenTests: XCTestCase {
         let later = GardenBuilder.build(sessions: s, events: [], calendar: dubai, now: ISO8601.date("2026-10-28T18:00:00Z")!)
         XCTAssertEqual(later.currentRun, 0)
         XCTAssertEqual(later.landmarks, [.path, .pond])
+    }
+
+    /// A good day is total focused time over the threshold (3 h by default). Stopped sessions'
+    /// focused time counts; breaks and NSDR neither count nor spoil the day.
+    func testGoodDayIsTotalFocusedTimeOverTheThreshold() {
+        let s = [focus("a1", day: 20, minutes: 90), focus("a2", day: 20, minutes: 90),            // 3 h exactly: good
+                 focus("a3", day: 20, minutes: 30, kind: .longBreak), focus("a4", day: 20, kind: .nsdr),
+                 focus("b1", day: 21, minutes: 170), focus("b2", day: 21, minutes: 15, outcome: .stoppedEarly), // 3 h 5 min: good
+                 focus("c1", day: 22, minutes: 25), focus("c2", day: 22, minutes: 25),            // two finished, 50 min: not good
+                 focus("d1", day: 23, minutes: 120), focus("d2", day: 23, minutes: 200, kind: .longBreak)] // breaks add nothing
+        let at = ISO8601.date("2026-10-23T18:00:00Z")!
+        let byDefault = GardenBuilder.build(sessions: s, events: [], calendar: dubai, now: at)
+        XCTAssertEqual(byDefault.goodDays, 2)
+        let lower = GardenBuilder.build(sessions: s, events: [], calendar: dubai, now: at, goodDayMinutes: 45)
+        XCTAssertEqual(lower.goodDays, 4)
+        XCTAssertEqual(GoodDay.label(180), "3 h")
+        XCTAssertEqual(GoodDay.label(150), "2 h 30 min")
+        XCTAssertEqual(GoodDay.label(45), "45 min")
     }
 
     func testFirefliesCountFinishedTasks() {
