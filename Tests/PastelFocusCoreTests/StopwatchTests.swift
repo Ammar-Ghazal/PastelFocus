@@ -11,7 +11,7 @@ final class StopwatchTests: XCTestCase {
         clock.advance(40 * 60)
         XCTAssertNil(e.tick(), "no end at 25 min")
         XCTAssertEqual(e.elapsedS, 2400)
-        XCTAssertNil(e.countdownEnd, "no notification or widget countdown")
+        XCTAssertNil(e.countdownEnd, "no end notification")
         let r = try e.stop(reason: "ignored")
         XCTAssertEqual(r.outcome, .completed)
         XCTAssertEqual(r.focusedS, 2400)
@@ -21,13 +21,13 @@ final class StopwatchTests: XCTestCase {
         XCTAssertTrue(r.isStopwatch)
     }
 
-    func testPausesAreRecordedAndStartAccountsForThem() throws {
+    func testPausesAreRecordedAndNotCounted() throws {
         let clock = FixedClock("2026-10-07T06:00:00Z")
         let e = FocusEngine(clock: clock)
         try e.start(task: nil, stopwatch: true)
         clock.advance(600); try e.pause()
         clock.advance(120); try e.resume()
-        XCTAssertEqual(e.stopwatchStart, ISO8601.date("2026-10-07T06:02:00Z"), "start shifted by the pause for count-up widgets")
+        XCTAssertEqual(e.elapsedS, 600, "the paused 2 minutes don't count")
         clock.advance(300)
         let r = try e.stop()
         XCTAssertEqual(r.focusedS, 900)

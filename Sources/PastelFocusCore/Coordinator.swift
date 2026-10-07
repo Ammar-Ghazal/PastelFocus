@@ -7,7 +7,6 @@ public final class Coordinator {
     public let calendar: DayCalendar
     public let clock: Clock
     public let supportDir: URL
-    public let widgetDir: URL?
 
     public let store: TaskStore
     public let recorder: SessionRecorder
@@ -22,19 +21,13 @@ public final class Coordinator {
     public private(set) var tasks: [TaskItem] = []
     public private(set) var insights: [Insight] = []
     public private(set) var problems: [String] = []
-    /// Theme the app is showing; copied into the widget snapshot.
-    public var themeSelection: ThemeSelection?
-    /// Bumped each time the widget snapshot actually changes, so the app reloads widgets only then.
-    public private(set) var widgetVersion = 0
 
     public init(config: VaultConfig, calendar: DayCalendar = DayCalendar(), clock: Clock = SystemClock(),
-                supportDir: URL = VaultConfig.defaultSupportDirectory, widgetDir: URL? = WidgetBridge.container,
-                preset: FocusPreset = .classic) {
+                supportDir: URL = VaultConfig.defaultSupportDirectory, preset: FocusPreset = .classic) {
         self.config = config
         self.calendar = calendar
         self.clock = clock
         self.supportDir = supportDir
-        self.widgetDir = widgetDir
         store = TaskStore(config: config, calendar: calendar, clock: clock)
         recorder = SessionRecorder(config: config, calendar: calendar, store: store)
         inbox = InboxProcessor(store: store, calendar: calendar, clock: clock)
@@ -53,7 +46,7 @@ public final class Coordinator {
     // MARK: Sync with the vault
 
     /// Call on launch and whenever the vault changes. Logs outside edits, stamps IDs,
-    /// applies Inbox commands and rewrites Now.md, Problems.md and the widget snapshot.
+    /// applies Inbox commands and rewrites Now.md and Problems.md.
     @discardableResult
     public func refresh() -> [TaskEvent] {
         let firstRun = tasks.isEmpty
@@ -148,8 +141,8 @@ public final class Coordinator {
                          stopwatch: engine.isStopwatch, elapsedS: engine.elapsedS)
     }
 
-    /// Today's numbers. The single source for Now.md, the daily note's summary, the widgets and
-    /// the panels, so Hermes and the app always report the same counts.
+    /// Today's numbers. The single source for Now.md, the daily note's summary and the panels,
+    /// so Hermes and the app always report the same counts.
     public struct DayTotals: Equatable {
         public var tasks: [TaskItem]
         public var done: Int { tasks.filter { $0.status == .done }.count }
@@ -165,53 +158,13 @@ public final class Coordinator {
         return DayTotals(tasks: todayTasks, rollup: rollup)
     }
 
-    /// Rewrites everything Hermes reads about today: Now.md, today's note summary and the widget snapshot.
+    /// Rewrites everything Hermes reads about today: Now.md and today's note summary.
     /// Each file is written only when its content changes (the app watches these folders).
     public func writeNow(appRunning: Bool = true) {
         let totals = todayTotals()
         let text = Reports.now(nowState(appRunning: appRunning), today: totals.tasks, rollup: totals.rollup, updated: clock.now(), calendar: calendar)
         _ = try? SafeFile.writeIfChanged(text, to: config.now, ignoring: "_Written by PastelFocus. Updated")
         try? writeDailySummary(day: today, totals: totals)
-        writeWidgetSnapshot(focusedToday: totals.rollup.focusedS)
-    }
-
-    public func writeWidgetSnapshot(focusedToday: Int) {
-        guard let dir = widgetDir else { return }
-        let rows = todayTasks.compactMap { t -> WidgetSnapshot.Row? in
-            guard let id = t.taskID else { return nil }
-            return WidgetSnapshot.Row(id: id, title: t.title, tag: t.priority == .high ? "High" : t.category?.capitalized,
-                                      done: t.status == .done, high: t.priority == .high)
-        }
-        let next = rows.first { !$0.done && $0.high } ?? rows.first { !$0.done }
-        var snap = WidgetSnapshot(updated: clock.now(), tasks: rows, doneCount: rows.filter(\.done).count, totalCount: rows.count,
-                                  phase: engine.phase, timerTitle: engine.active?.task?.title ?? (engine.phase == .resting ? "Rest" : "Pick a task"),
-                                  timerEnd: engine.countdownEnd, remainingS: engine.remainingS, nextTask: next,
-                                  focusedMinutesToday: focusedToday / 60, goodDays: garden().goodDays)
-        snap.timerStart = engine.stopwatchStart
-        snap.elapsedS = engine.isStopwatch ? engine.elapsedS : nil
-        snap.theme = themeSelection
-        var unchanged = WidgetBridge.read(from: dir)
-        unchanged.updated = snap.updated
-        if unchanged == snap { return }
-        try? WidgetBridge.write(snap, to: dir)
-        widgetVersion += 1
-    }
-
-    /// Applies taps queued by the widgets.
-    public func drainWidgetCommands() {
-        guard let dir = widgetDir else { return }
-        for c in WidgetBridge.drain(in: dir) {
-            switch c.action {
-            case .toggleTask:
-                guard let id = c.taskID, let t = store.find(id) else { continue }
-                try? perform { try $0.setStatus(id, t.status == .done ? .todo : .done, actor: .you) }
-            case .startFocus:
-                let t = c.taskID.flatMap { store.find($0) }
-                try? startFocus(task: t)
-            case .pauseFocus: try? engine.pause(); saveEngine(); writeNow()
-            case .resumeFocus: try? engine.resume(); saveEngine(); writeNow()
-            }
-        }
     }
 
     public func garden() -> Garden {

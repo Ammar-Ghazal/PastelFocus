@@ -1,7 +1,7 @@
 import PastelFocusCore
 import SwiftUI
 
-/// Static backdrop art for a theme, drawn once (no per-frame work). Shared by panels and widgets.
+/// Static backdrop art for a theme, drawn once (no per-frame work).
 /// `includeMovers` draws the things the app animates (planets, fireflies, petals…) in a fixed pose;
 /// the app turns it off and lets Core Animation move them instead.
 struct SceneArt: View {

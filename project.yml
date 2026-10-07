@@ -20,10 +20,9 @@ targets:
   PastelFocus:
     type: application
     platform: macOS
-    sources: [App, Shared]
+    sources: [App]
     dependencies:
       - package: PastelFocusCore
-      - target: PastelFocusWidgets
     info:
       path: App/Info.plist
       properties:
@@ -31,37 +30,7 @@ targets:
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: "Local-first focus and tasks for Ammar"
-    entitlements:
-      path: App/PastelFocus.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - 58FZ49BXRF.com.ammarghazal.pastelfocus
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ammarghazal.pastelfocus
         PRODUCT_NAME: PastelFocus
-  PastelFocusWidgets:
-    type: app-extension
-    platform: macOS
-    sources: [Widgets, Shared]
-    dependencies:
-      - package: PastelFocusCore
-      - sdk: WidgetKit.framework
-      - sdk: SwiftUI.framework
-    info:
-      path: Widgets/Info.plist
-      properties:
-        CFBundleDisplayName: PastelFocus Widgets
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    entitlements:
-      path: Widgets/PastelFocusWidgets.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.application-groups:
-          - 58FZ49BXRF.com.ammarghazal.pastelfocus
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ammarghazal.pastelfocus.widgets
-        PRODUCT_NAME: PastelFocusWidgets
-        SKIP_INSTALL: YES

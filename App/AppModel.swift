@@ -3,7 +3,6 @@ import Combine
 import PastelFocusCore
 import ServiceManagement
 import SwiftUI
-import WidgetKit
 
 enum TaskFilter: String, CaseIterable { case all = "All", focus = "Focus", later = "Later", done = "Done" }
 
@@ -70,7 +69,7 @@ final class AppModel: ObservableObject {
 
     init(settings: AppSettings) {
         self.settings = settings
-        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, widgetDir: settings.widgetDir, preset: settings.preset)
+        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, preset: settings.preset)
         coordinator.inbox.actions = self
         notifier.onAction = { [weak self] action, info in self?.handleNotification(action, info: info) }
         if AppSettings.devName == nil { hotKeys = HotKeys(startPause: { [weak self] in self?.startPauseShortcut() }, stop: { [weak self] in self?.stop(reason: nil) }) }
@@ -94,7 +93,6 @@ final class AppModel: ObservableObject {
         let systemDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let (definition, palette) = ThemeCatalog.resolve(settings.themeSelection, matchSystem: settings.matchSystemAppearance,
                                                          systemDark: systemDark)
-        coordinator.themeSelection = ThemeSelection(themeID: definition.id, paletteID: palette.id)
         let next = Theme(definition, palette)
         guard next.palette.id != theme.palette.id else { return }
         theme = next
@@ -127,18 +125,15 @@ final class AppModel: ObservableObject {
 
     func rebuildCoordinator() {
         coordinator.writeNow(appRunning: false)
-        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, widgetDir: settings.widgetDir, preset: settings.preset)
+        coordinator = Coordinator(config: settings.vaultConfig, supportDir: settings.supportDir, preset: settings.preset)
         coordinator.inbox.actions = self
-        coordinator.themeSelection = ThemeSelection(themeID: theme.definition.id, paletteID: theme.palette.id)
         start()
     }
 
     private func start() {
         let c = coordinator.config
         for dir in [c.dailyDir, c.appDir] { try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
-        var paths = [c.dailyDir.path, c.appDir.path]
-        if let w = coordinator.widgetDir { try? FileManager.default.createDirectory(at: w, withIntermediateDirectories: true); paths.append(w.path) }
-        watcher = FileWatcher(paths: paths) { [weak self] in self?.scheduleRefresh() }
+        watcher = FileWatcher(paths: [c.dailyDir.path, c.appDir.path]) { [weak self] in self?.scheduleRefresh() }
         refreshNow()
         if lastNightlyDay != coordinator.today { runNightly() }
         startTicker()
@@ -162,7 +157,6 @@ final class AppModel: ObservableObject {
 
     func refreshNow() {
         let before = coordinator.store.events.readAll().count
-        coordinator.drainWidgetCommands()
         coordinator.refresh()
         let newEvents = coordinator.store.events.readAll().dropFirst(before)
         if let e = newEvents.last(where: { $0.actor == .hermes }) { offerUndo(for: e) }
@@ -190,13 +184,7 @@ final class AppModel: ObservableObject {
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
             selectedTaskID = (tasks.first { $0.status.isOpen && $0.priority == .high } ?? tasks.first { $0.status.isOpen })?.taskID
         }
-        if c.widgetVersion != lastWidgetVersion {
-            lastWidgetVersion = c.widgetVersion
-            WidgetCenter.shared.reloadAllTimelines()
-        }
     }
-
-    private var lastWidgetVersion = -1
 
     var filteredTasks: [TaskItem] { tasks(for: filter) }
 
