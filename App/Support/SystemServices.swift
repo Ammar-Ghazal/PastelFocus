@@ -147,6 +147,12 @@ struct PanelResizeHandle: NSViewRepresentable {
             startFrame = window?.frame ?? .zero
         }
 
+        override func mouseUp(with event: NSEvent) {
+            // Remember the height the user chose (see `PanelController.savedHeight`).
+            guard let w = window, let name = w.identifier?.rawValue else { return }
+            UserDefaults.standard.set(Double(w.frame.height), forKey: PanelController.heightKey(name))
+        }
+
         override func mouseDragged(with event: NSEvent) {
             guard let w = window else { return }
             let wanted = startFrame.height + (startMouseY - NSEvent.mouseLocation.y) // dragging down makes it taller
@@ -165,6 +171,14 @@ struct PanelResizeHandle: NSViewRepresentable {
 @MainActor
 final class PanelController {
     private(set) var panels: [String: DesktopPanel] = [:]
+
+    /// macOS restores only the position of a remembered frame for windows that aren't `.resizable`
+    /// (these borderless panels), so a user-chosen height is stored separately.
+    static func heightKey(_ name: String) -> String { "PastelFocus.\(name).height" }
+    static func savedHeight(_ name: String) -> CGFloat? {
+        let h = UserDefaults.standard.double(forKey: heightKey(name))
+        return h > 0 ? CGFloat(h) : nil
+    }
 
     /// `heightRange`: lets the user drag the panel's height within the range (see `PanelResizeHandle`);
     /// the height they chose is remembered. Without it the panel always has `size`.
@@ -185,14 +199,16 @@ final class PanelController {
         let host = FirstMouseHostingView(rootView: content().focusEffectDisabled())
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host
+        panel.identifier = NSUserInterfaceItemIdentifier(name)
         panel.setFrameAutosaveName("PastelFocus.\(name)")
         if let range = heightRange {
-            // Keep the remembered height (clamped) and the top edge; the width is fixed.
+            // Apply the remembered height (clamped), keeping the top edge: macOS restores the remembered
+            // frame top-anchored at the default height, so this lands exactly where it was left.
             host.sizingOptions = []
             panel.contentMinSize = CGSize(width: size.width, height: range.lowerBound)
             panel.contentMaxSize = CGSize(width: size.width, height: range.upperBound)
             var frame = panel.frame
-            let height = min(range.upperBound, max(range.lowerBound, frame.height))
+            let height = min(range.upperBound, max(range.lowerBound, Self.savedHeight(name) ?? size.height))
             frame.origin.y += frame.height - height
             frame.size = CGSize(width: size.width, height: height)
             panel.setFrame(frame, display: false)
