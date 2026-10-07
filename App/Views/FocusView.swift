@@ -348,7 +348,7 @@ struct ProgressPanelView: View {
             IsoPlotView(plot: plot).frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
                 Text(progressText).font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.textPrimary).lineLimit(1)
-                    .help("A good day is one with at least 2 finished focus sessions. The streak allows one missed day per week.")
+                    .help("A good day is one with at least \(GoodDay.label(model.settings.goodDayMinutes)) of focused time (change it in Settings). Breaks don't count against it. The streak allows one missed day per week.")
                 Spacer()
                 if let next = Landmark.allCases.first(where: { !model.garden.landmarks.contains($0) }) {
                     Text("\(name(next).capitalized) unlocks at \(next.goodDays) good days").font(.system(size: 11)).foregroundStyle(theme.textSecondary)

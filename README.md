@@ -112,7 +112,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Night Garden
 
-Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days (≥2 finished sessions) unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week.
+Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week. A good day is total focused time across all focus sessions (finished or stopped) reaching a threshold you set in Settings, 3 h by default; breaks and NSDR neither count nor spoil it. Stats files show the same count.
 
 Like Forest, the garden is an isometric block of land with **Day / Week / Month** views (arrows step back through earlier periods). The plot starts at 4×4 tiles and grows so it's never more than ~45% full; tiles shrink as it grows, so the view zooms out instead of getting cluttered. Each session has a fixed home (a fraction of the plot from an FNV-1a seed of its id) and takes the free tile nearest it, earliest sessions first, so plants stay within about a tile of their relative spot as the plot grows. The save button writes the period you're viewing to `PastelFocus/Garden/` (`2026-10.png`, `2026-W41.png` or `2026-10-07.png`); last month's is saved automatically. Fireflies (one per finished task) and the waterfall are Core Animation layers.
 
@@ -152,7 +152,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 
 ## Settings (menu bar → Settings…)
 
-Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · open at login. Appearance tab: theme, colour combo, ambient motion, match macOS light/dark.
+Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · good-day threshold (3 h) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · open at login. Appearance tab: theme, colour combo, ambient motion, match macOS light/dark.
 
 ## Code map
 

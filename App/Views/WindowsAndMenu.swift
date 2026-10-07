@@ -92,6 +92,12 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 TextField("NSDR audio (file path or link)", text: $settings.nsdrAudio)
             }
+            Section("Night Garden") {
+                Stepper("A good day is \(GoodDay.label(settings.goodDayMinutes)) of focus", value: $settings.goodDayMinutes,
+                        in: GoodDay.range, step: GoodDay.step)
+                Text("Total focused time in a day, across all focus sessions. Breaks don't count against it. Good days build your streak and unlock garden landmarks.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Panels") {
                 Toggle("Float panels above other windows", isOn: $settings.floatPanels)
                 Toggle("Today", isOn: $settings.showToday)

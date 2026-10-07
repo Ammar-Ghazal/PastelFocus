@@ -91,11 +91,13 @@ final class AnalyticsTests: XCTestCase {
         XCTAssertEqual(r.nsdr, 1)
         XCTAssertEqual(r.focusedS, 35 * 60)
         XCTAssertEqual(r.tasksDone, 1)
-        XCTAssertFalse(r.isGoodDay)
+        XCTAssertFalse(r.isGoodDay())
+        XCTAssertTrue(r.isGoodDay(minFocusedMinutes: 30))
 
         let md = Reports.stats(title: "Week 2026-W44", days: ["2026-10-31"], rollups: ["2026-10-31": r], sessions: s)
         XCTAssertTrue(md.contains("| Focused time | 35 min |"))
         XCTAssertTrue(md.contains("| Finish rate | 50% |"))
+        XCTAssertTrue(md.contains("| Good days (3 h+ focused) | 0 of 1 |"))
 
         let empty = Reports.insights([], totalFocusSessions: 3, since: "2026-10-30", updated: now, calendar: dubai)
         XCTAssertTrue(empty.contains("**Still learning.** 3 focus sessions logged since 2026-10-30."))

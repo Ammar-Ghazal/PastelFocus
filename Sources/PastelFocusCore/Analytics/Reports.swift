@@ -16,8 +16,21 @@ public struct DailyRollup: Codable, Sendable, Equatable {
 
     public init(day: String) { self.day = day }
 
-    /// A "good day" for the garden: at least 2 finished focus sessions.
-    public var isGoodDay: Bool { completed >= 2 }
+    /// A "good day" for the garden: total focused time (every focus session, finished or stopped)
+    /// reaches the threshold. Breaks add nothing and take nothing away.
+    public func isGoodDay(minFocusedMinutes: Int = GoodDay.defaultMinutes) -> Bool { focusedS >= minFocusedMinutes * 60 }
+}
+
+/// What counts as a good day. The threshold is a setting; this is its default.
+public enum GoodDay {
+    public static let defaultMinutes = 180
+    public static let range = 30...720
+    public static let step = 30
+
+    /// "3 h", "2 h 30 min", "45 min".
+    public static func label(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes) min" : minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
+    }
 }
 
 public enum Rollups {
@@ -111,7 +124,8 @@ public enum Reports {
     }
 
     /// Weekly or monthly summary.
-    public static func stats(title: String, days: [String], rollups: [String: DailyRollup], sessions: [SessionRecord]) -> String {
+    public static func stats(title: String, days: [String], rollups: [String: DailyRollup], sessions: [SessionRecord],
+                             goodDayMinutes: Int = GoodDay.defaultMinutes) -> String {
         let rs = days.compactMap { rollups[$0] }
         let focused = rs.reduce(0) { $0 + $1.focusedS }
         let completed = rs.reduce(0) { $0 + $1.completed }
@@ -125,7 +139,7 @@ public enum Reports {
                      "| Tasks done | \(rs.reduce(0) { $0 + $1.tasksDone }) |",
                      "| Postponements | \(rs.reduce(0) { $0 + $1.postponements }) |",
                      "| Breaks (NSDR) | \(rs.reduce(0) { $0 + $1.breaks }) (\(rs.reduce(0) { $0 + $1.nsdr })) |",
-                     "| Good days (2+ finished sessions) | \(rs.filter(\.isGoodDay).count) of \(days.count) |", ""]
+                     "| Good days (\(GoodDay.label(goodDayMinutes))+ focused) | \(rs.filter { $0.isGoodDay(minFocusedMinutes: goodDayMinutes) }.count) of \(days.count) |", ""]
         var cats: [String: Int] = [:]
         for r in rs { for (k, v) in r.focusedByCategory { cats[k, default: 0] += v } }
         if !cats.isEmpty {

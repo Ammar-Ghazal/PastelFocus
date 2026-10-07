@@ -21,6 +21,8 @@ public final class Coordinator {
     public private(set) var tasks: [TaskItem] = []
     public private(set) var insights: [Insight] = []
     public private(set) var problems: [String] = []
+    /// Focused minutes that make a good day (a user setting).
+    public var goodDayMinutes = GoodDay.defaultMinutes
 
     public init(config: VaultConfig, calendar: DayCalendar = DayCalendar(), clock: Clock = SystemClock(),
                 supportDir: URL = VaultConfig.defaultSupportDirectory, preset: FocusPreset = .classic) {
@@ -168,7 +170,8 @@ public final class Coordinator {
     }
 
     public func garden() -> Garden {
-        GardenBuilder.build(sessions: recorder.log.readAll(), events: store.events.readAll(), calendar: calendar, now: clock.now())
+        GardenBuilder.build(sessions: recorder.log.readAll(), events: store.events.readAll(), calendar: calendar, now: clock.now(),
+                           goodDayMinutes: goodDayMinutes)
     }
 
     // MARK: Nightly
@@ -193,7 +196,8 @@ public final class Coordinator {
             let days = (0..<7).map { calendar.addDays($0, to: weekStart) }
             let label = calendar.isoWeek(calendar.startOfDay(weekStart)!)
             let periodSessions = sessions.filter { days.contains(calendar.day($0.startedAt)) }
-            try Reports.stats(title: "Week \(label)", days: days, rollups: rollups, sessions: periodSessions)
+            try Reports.stats(title: "Week \(label)", days: days, rollups: rollups, sessions: periodSessions,
+                              goodDayMinutes: goodDayMinutes)
                 .write(to: config.statsDir.appendingPathComponent("\(label).md"), atomically: true, encoding: .utf8)
         }
         let month = calendar.month(now)
@@ -201,7 +205,7 @@ public final class Coordinator {
         var d = month + "-01"
         while d.hasPrefix(month) { monthDays.append(d); d = calendar.addDays(1, to: d) }
         try Reports.stats(title: "Month \(month)", days: monthDays, rollups: rollups,
-                          sessions: sessions.filter { calendar.month($0.startedAt) == month })
+                          sessions: sessions.filter { calendar.month($0.startedAt) == month }, goodDayMinutes: goodDayMinutes)
             .write(to: config.statsDir.appendingPathComponent("\(month).md"), atomically: true, encoding: .utf8)
 
         try writeDailySummary(day: today, totals: todayTotals())
