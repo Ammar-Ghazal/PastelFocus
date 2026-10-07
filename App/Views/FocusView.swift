@@ -351,7 +351,8 @@ struct ProgressPanelView: View {
                     .help("A good day is one with at least \(GoodDay.label(model.settings.goodDayMinutes)) of focused time (change it in Settings). Breaks don't count against it. The streak allows one missed day per week.")
                 Spacer()
                 if let next = Landmark.allCases.first(where: { !model.garden.landmarks.contains($0) }) {
-                    Text("\(name(next).capitalized) unlocks at \(next.goodDays) good days").font(.system(size: 11)).foregroundStyle(theme.textSecondary)
+                    let left = next.goodDays - model.garden.goodDays
+                    Text("\(name(next).capitalized) unlocks in \(left) good day\(left == 1 ? "" : "s")").font(.system(size: 11)).foregroundStyle(theme.textSecondary)
                         .help("Good days unlock landmarks: path, pond, stone lantern, red bridge, small house, waterfall.")
                 }
                 Button { model.savePostcard(period, containing: day) } label: { Image(systemName: "square.and.arrow.down") }
@@ -365,7 +366,7 @@ struct ProgressPanelView: View {
 
     private var progressText: String {
         let g = model.garden
-        return "\(g.goodDays) good day\(g.goodDays == 1 ? "" : "s") · \(g.currentRun) day streak"
+        return "\(g.currentRun) day streak"
     }
 
     private func count(_ plot: GardenPlot) -> String {
