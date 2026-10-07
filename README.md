@@ -54,7 +54,7 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 | `PastelFocus/Stats/YYYY-Www.md`, `YYYY-MM.md` | app (nightly) | Weekly / monthly summaries |
 | `PastelFocus/Logs/{sessions,events,suggestions}-YYYY-MM.jsonl` | app | Append-only raw history (or private, see Settings) |
 | `PastelFocus/Problems.md` | app | Lines it couldn't read (never deletes them) |
-| `PastelFocus/Garden/YYYY-MM.png` | app | Monthly garden postcard |
+| `PastelFocus/Garden/YYYY-MM.png` (or `YYYY-Www`, `YYYY-MM-DD`) | app | Garden postcard: each month automatically, any view on request |
 
 ### Task line (Obsidian Tasks plugin format)
 
@@ -112,14 +112,16 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Night Garden
 
-Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days (≥2 finished sessions) unlock a path, pond, stone lantern, red bridge, small house and waterfall. Layout is deterministic (FNV-1a seed per session), so it never reshuffles.
+Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days (≥2 finished sessions) unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week.
+
+Like Forest, the garden is an isometric block of land with **Day / Week / Month** views (arrows step back through earlier periods). The plot starts at 4×4 tiles and grows so it's never more than ~45% full; tiles shrink as it grows, so the view zooms out instead of getting cluttered. Each session has a fixed home (a fraction of the plot from an FNV-1a seed of its id) and takes the free tile nearest it, earliest sessions first, so plants stay within about a tile of their relative spot as the plot grows. The save button writes the period you're viewing to `PastelFocus/Garden/` (`2026-10.png`, `2026-W41.png` or `2026-10-07.png`); last month's is saved automatically. Fireflies (one per finished task) and the waterfall are Core Animation layers.
 
 ## Build, test, install
 
 Xcode's window can stay closed: XcodeGen generates the project from `project.yml`, and `xcodebuild` builds the native macOS app using the installed Xcode tools. Full Xcode is required. See the [terminal development workflow](docs/DEVELOPMENT_WORKFLOW.md#4-the-daily-terminal-build-test-and-fix-loop) for setup, isolated launches, screenshots, and release archives.
 
 ```bash
-swift test                      # 85 unit/integration tests for PastelFocusCore; does not package the app
+swift test                      # unit/integration tests for PastelFocusCore; does not package the app
 xcodegen generate
 xcodebuild -project PastelFocus.xcodeproj -scheme PastelFocus -configuration Debug \
   -destination 'platform=macOS' -derivedDataPath build build
@@ -139,7 +141,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `InboxTests` | Command parsing, apply + tick results, focus commands, header |
 | `AnalyticsTests` | Wilson interval, thresholds, focus span, category, fatigue, estimates, postponed, reports |
 | `SuggestionTests` | Each rule, never mid-session, budget, dismissals, mute |
-| `GardenTests` | Growth rules, stable non-overlapping layout, landmarks/run, fireflies |
+| `GardenTests` | Growth rules, stable non-overlapping layout per period, plot grows with items, plants keep their relative spot as it grows, period keys/shifts, landmarks/run, fireflies |
 | `StopReasonsTests` | Shortening, saving, de-duplication, short label in the note |
 | `DialMathTests` | Angle ↔ minutes, 5-min snapping, no wrap across 12, rest scaling |
 | `StopwatchTests` | Count up, stop = completed, pauses, 4 h cap, old state loads, analytics |

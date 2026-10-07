@@ -436,16 +436,16 @@ final class AppModel: ObservableObject {
             toast = UndoToast(text: "Nightly analysis failed: \(error)", undo: {})
         }
         // New month: save last month's postcard.
-        if let p = previous, p.prefix(7) != coordinator.today.prefix(7) { savePostcard(month: String(p.prefix(7))) }
+        if let p = previous, p.prefix(7) != coordinator.today.prefix(7) { savePostcard(.month, containing: p) }
         publish()
     }
 
-    func savePostcard(month: String? = nil) {
-        let m = month ?? String(coordinator.today.prefix(7))
-        let islands = garden.islands.filter { island in
-            island.items.contains { $0.day.hasPrefix(m) }
-        }
-        let view = PostcardView(month: m, islands: islands, garden: garden).environment(\.theme, theme)
+    /// Saves a period's garden (this month by default) as PastelFocus/Garden/<period>.png,
+    /// e.g. 2026-10.png, 2026-W41.png or 2026-10-07.png.
+    func savePostcard(_ period: GardenPeriod = .month, containing day: String? = nil) {
+        let plot = garden.plot(period, containing: day ?? coordinator.today, calendar: coordinator.calendar)
+        let m = plot.key
+        let view = PostcardView(title: m, plot: plot, garden: garden).environment(\.theme, theme)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

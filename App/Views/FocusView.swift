@@ -316,42 +316,94 @@ struct ProgressPanelView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
     @Environment(\.snapshotMode) var snapshot
-    @State private var month = false
+    @State private var period: GardenPeriod = .day
+    /// Periods back from the current one (0 = today / this week / this month).
+    @State private var offset = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let cal = model.coordinator.calendar
+        let day = period.shift(model.coordinator.today, by: -offset, calendar: cal)
+        let plot = model.garden.plot(period, containing: day, calendar: cal)
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 PanelTitle("Night Garden")
                 Spacer()
-                if snapshot { Text("Week · Month").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
-                else { Picker("", selection: $month) { Text("Week").tag(false); Text("Month").tag(true) }.pickerStyle(.segmented).frame(width: 130) }
-            }
-            if month {
-                let islands = Array(model.garden.islands.suffix(5))
-                HStack(spacing: 6) {
-                    ForEach(islands, id: \.week) { IslandView(island: $0, landmarks: model.garden.landmarks, cell: 6, animate: false) }
+                if snapshot { Text("Day · Week · Month").font(.system(size: 11)).foregroundStyle(theme.textSecondary) }
+                else {
+                    Picker("", selection: $period) {
+                        Text("Day").tag(GardenPeriod.day); Text("Week").tag(GardenPeriod.week); Text("Month").tag(GardenPeriod.month)
+                    }
+                    .pickerStyle(.segmented).frame(width: 170)
+                    .onChange(of: period) { offset = 0 }
                 }
-                .frame(maxWidth: .infinity)
-            } else {
-                IslandView(island: model.garden.islands.last { $0.week == currentWeek }, landmarks: model.garden.landmarks, cell: 26)
-                    .frame(maxWidth: .infinity)
             }
+            HStack(spacing: 6) {
+                stepButton("chevron.left", help: "Earlier") { offset += 1 }
+                Text(title(day, cal)).font(.system(size: 12, weight: .medium)).foregroundStyle(theme.textSecondary)
+                    .frame(minWidth: 110)
+                stepButton("chevron.right", help: "Later") { offset -= 1 }.disabled(offset == 0).opacity(offset == 0 ? 0.3 : 1)
+                Spacer()
+                Text(count(plot)).font(.system(size: 11)).foregroundStyle(theme.textTertiary)
+            }
+            IsoPlotView(plot: plot).frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
-                PixelLabel(text: "\(model.garden.goodDays) good days · run \(model.garden.currentRun)", size: 12)
+                Text(progressText).font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.textPrimary).lineLimit(1)
+                    .help("A good day is one with at least 2 finished focus sessions. The streak allows one missed day per week.")
                 Spacer()
                 if let next = Landmark.allCases.first(where: { !model.garden.landmarks.contains($0) }) {
-                    Text("next: \(name(next)) at \(next.goodDays)").font(.system(size: 11)).foregroundStyle(theme.textSecondary)
+                    Text("\(name(next).capitalized) unlocks at \(next.goodDays) good days").font(.system(size: 11)).foregroundStyle(theme.textSecondary)
+                        .help("Good days unlock landmarks: path, pond, stone lantern, red bridge, small house, waterfall.")
                 }
-                Button { model.savePostcard() } label: { Image(systemName: "square.and.arrow.down") }
-                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary).help("Save this month as a postcard in the vault")
+                Button { model.savePostcard(period, containing: day) } label: { Image(systemName: "square.and.arrow.down") }
+                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary).help("Save the garden you're viewing as a postcard in the vault")
             }
         }
         .padding(PanelStyle.padding)
-        .frame(width: 380, height: 280, alignment: .topLeading)
+        .frame(width: 380, height: 300, alignment: .topLeading)
         .background(GlassBackground(radius: 18))
     }
 
-    private var currentWeek: String { model.coordinator.calendar.isoWeek(Date()) }
+    private var progressText: String {
+        let g = model.garden
+        return "\(g.goodDays) good day\(g.goodDays == 1 ? "" : "s") · \(g.currentRun)-day streak"
+    }
+
+    private func count(_ plot: GardenPlot) -> String {
+        let n = plot.items.filter { $0.kind == .plant }.count
+        return n == 0 ? "" : "\(n) plant\(n == 1 ? "" : "s")"
+    }
+
+    private func stepButton(_ icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.textSecondary)
+                .frame(width: 18, height: 18).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(help)
+    }
+
+    /// "Today", "Wed 7 Oct", "5 – 11 Oct", "October 2026".
+    private func title(_ day: String, _ cal: DayCalendar) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_GB")
+        f.timeZone = cal.timeZone
+        switch period {
+        case .day:
+            if offset == 0 { return "Today" }
+            if offset == 1 { return "Yesterday" }
+            f.dateFormat = "EEE d MMM"
+            return cal.startOfDay(day).map(f.string) ?? day
+        case .week:
+            guard let d = cal.startOfDay(day), let start = cal.startOfDay(cal.weekStart(d)),
+                  let end = cal.startOfDay(cal.addDays(6, to: cal.weekStart(d))) else { return day }
+            f.dateFormat = "d"
+            let a = f.string(from: start)
+            f.dateFormat = "d MMM"
+            return "\(a) – \(f.string(from: end))"
+        case .month:
+            f.dateFormat = "MMMM yyyy"
+            return cal.startOfDay(day).map(f.string) ?? day
+        }
+    }
 
     private func name(_ l: Landmark) -> String {
         switch l {
