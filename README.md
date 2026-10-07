@@ -148,6 +148,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `LogCacheTests` | Cache hits, appends and outside edits invalidate |
 | `ThemeTests` | 12 themes × 21 palettes: contrast, gamut, unique IDs, distinguishable tags, light/dark matching |
 | `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, nightly files, index rebuild |
+| `CareerCoachContractTests` | Link career-coach boundary: Inbox create/reschedule round-trip without duplicates, wiki/report checklists never become tasks; replays a real coach run (on a temp copy) when `PASTELFOCUS_COACH_FIXTURE` is set |
 
 ## Settings (menu bar → Settings…)
 
