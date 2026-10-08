@@ -9,7 +9,7 @@ struct TagsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("The first tag on a task line decides the plant it grows (#later marks priority and is skipped). Tags you or Hermes write are added here automatically. Several tags can share a plant.")
+            Text("The first tag on a task line decides the plant it grows (#later marks priority and is skipped). Tags you or Hermes write are added here automatically. Several tags can share a plant. Drag to reorder: the Today panel's filter pills follow this order.")
                 .font(.callout).foregroundStyle(.secondary)
             if model.tags.tags.isEmpty {
                 Text("No tags yet. Add one below, or tag a task like “Read chapter 3 #learning”.")
@@ -20,6 +20,7 @@ struct TagsView: View {
             } else {
                 List {
                     ForEach(model.tags.tags) { TagRow(tag: $0) }
+                        .onMove { from, to in model.changeTags { c in try c.updateTags { $0.move(fromOffsets: from, toOffset: to) } } }
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }

@@ -50,6 +50,17 @@ final class TagsTests: XCTestCase {
         XCTAssertTrue(r.tags.isEmpty)
     }
 
+    func testReorderKeepsHiddenTagsInPlace() {
+        var r = TagRegistry(["a", "b", "c", "d", "e"].map { TagDefinition(name: $0, slot: .a) })
+        r.reorder(["#D", "b", "nope", "b"]) // only b and d are shown, dragged d before b
+        XCTAssertEqual(r.tags.map(\.name), ["a", "d", "c", "b", "e"])
+        r.move(fromOffsets: [4], toOffset: 0)
+        XCTAssertEqual(r.tags.map(\.name), ["e", "a", "d", "c", "b"])
+        r.move(fromOffsets: [0, 1], toOffset: 5)
+        XCTAssertEqual(r.tags.map(\.name), ["d", "c", "b", "e", "a"])
+        XCTAssertEqual(TagRegistry.parse(r.markdown()).tags.map(\.name), r.tags.map(\.name), "the order is kept in Tags.md")
+    }
+
     func testTagsMarkdownRoundTripsAndToleratesHandEdits() {
         var r = TagRegistry([TagDefinition(name: "career", slot: .c), TagDefinition(name: "coding", slot: .j)])
         r.setOverride(.e, for: "coding", theme: "deep-space")

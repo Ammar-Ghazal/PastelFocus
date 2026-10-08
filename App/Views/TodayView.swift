@@ -60,21 +60,7 @@ struct TodayView: View {
 
     private var pills: some View {
         HStack(spacing: 8) {
-            ForEach(TaskFilter.allCases, id: \.self) { f in
-                let active = model.filter == f
-                Button { model.filter = f } label: {
-                    HStack(spacing: 6) {
-                        Text(f.rawValue)
-                        Text("\(model.count(f))").opacity(0.8)
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(.horizontal, 16).frame(height: 34)
-                    .foregroundStyle(active ? theme.onAccent : theme.textSecondary)
-                    .background(Capsule().fill(active ? AnyShapeStyle(theme.accent) : AnyShapeStyle(theme.elevated)))
-                }
-                .buttonStyle(.plain)
-            }
-            Spacer()
+            FilterPills().frame(maxWidth: .infinity, alignment: .leading)
             Button { withAnimation(.easeOut(duration: 0.2)) { adding.toggle(); fieldFocused = adding } } label: {
                 Image(systemName: adding ? "xmark" : "plus").font(.system(size: 20, weight: .semibold)).foregroundStyle(theme.onAccent)
                     .frame(width: 48, height: 48).background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
