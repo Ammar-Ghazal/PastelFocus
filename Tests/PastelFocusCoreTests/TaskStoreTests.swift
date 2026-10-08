@@ -116,6 +116,51 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(SafeFile.readLines(url), before)
     }
 
+    func testEditorSaveWritesOnlyChangedFields() throws {
+        let original = try XCTUnwrap(store.find("r7q2"))
+        // Hermes logs a session while the editor is open.
+        try store.setActualSessions("r7q2", 2)
+        var edited = original
+        edited.description = "Finalize resume — SWE version #career #writing"
+        edited.priority = .urgent
+        edited.due = "2026-10-10"
+        edited.notes = ["Use the SWE template", "  Ask Sam to review  ", ""]
+        let saved = try store.apply("r7q2", from: original, to: edited, actor: .you)
+        XCTAssertEqual(saved.actualSessions, 2, "the concurrent change survives")
+        XCTAssertEqual(saved.estimateSessions, 3)
+        let lines = SafeFile.readLines(config.dailyNote("2026-10-06"))
+        let i = try XCTUnwrap(lines.firstIndex { $0.contains("🆔 r7q2") })
+        XCTAssertEqual(lines[i], "- [ ] Finalize resume — SWE version #career #writing [est:: 3] [sessions:: 2] 🔺 📅 2026-10-10 🆔 r7q2")
+        XCTAssertEqual(Array(lines[(i + 1)...(i + 2)]), ["    - Use the SWE template", "    - Ask Sam to review"])
+        XCTAssertEqual(lines[i + 3], "- [ ] Old legacy task without id")
+        let types = store.events.readAll().filter { $0.taskId == "r7q2" && $0.actor == .you }.map { $0.field ?? "" }
+        XCTAssertEqual(Set(types), ["priority", "description", "due", "notes"])
+    }
+
+    func testEditorAddsNotesAndCompletes() throws {
+        let original = try XCTUnwrap(store.find("c4x8"))
+        var edited = original
+        edited.notes = ["First note"]
+        edited.status = .done
+        try store.apply("c4x8", from: original, to: edited, actor: .you)
+        let lines = SafeFile.readLines(config.dailyNote("2026-10-07"))
+        XCTAssertEqual(lines.suffix(2), ["- [x] Pick target countries #career 🔼 ✅ 2026-10-07 🆔 c4x8", "    - First note"])
+        XCTAssertEqual(store.events.readAll().last { $0.taskId == "c4x8" && $0.field == "status" }?.type, .completed)
+        // Saving with nothing changed leaves the file alone.
+        let now = try XCTUnwrap(store.find("c4x8"))
+        try store.apply("c4x8", from: now, to: now, actor: .you)
+        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-07")), lines)
+    }
+
+    func testEditingLegacyLineWritesPriorityEmoji() throws {
+        write("## Today's task list\n\n- [ ] **P2 · 50 min** Old plan 🆔 leg1\n", to: config.dailyNote("2026-10-05"))
+        let original = try XCTUnwrap(store.find("leg1"))
+        var edited = original
+        edited.description = "Old plan, renamed"
+        try store.apply("leg1", from: original, to: edited, actor: .you)
+        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-05")).last, "- [ ] Old plan, renamed [est:: 2] 🔼 🆔 leg1")
+    }
+
     func testDiffDetectsExternalEdits() {
         let old = store.scan().tasks
         var new = old

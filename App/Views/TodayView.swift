@@ -178,7 +178,6 @@ struct TaskRow: View {
                     .strikethrough(done, color: theme.textTertiary)
                     .foregroundStyle(done ? theme.textTertiary : theme.textPrimary)
                     .lineLimit(1)
-                    .onTapGesture { model.openInObsidian(task) }
                 HStack(spacing: 6) {
                     if let s = task.subtitle { Text(s).lineLimit(1) }
                     if let e = task.estimateSessions { Text("· \(task.actualSessions ?? 0)/\(e) sessions") }
@@ -207,6 +206,9 @@ struct TaskRow: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(highlighted && !done ? theme.highlight : (hover ? Color.white.opacity(0.035) : .clear)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(highlighted && !done ? theme.accent.opacity(0.2) : .clear))
         .onHover { h in withAnimation(.easeOut(duration: 0.14)) { hover = h } }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { model.edit(task) }
+        .help("Double-click to view or edit")
         .contextMenu { actions }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .none ? "" : ", \(task.priority.label.lowercased()) priority")")
@@ -216,6 +218,7 @@ struct TaskRow: View {
 extension TaskRow {
     /// The ⋯ menu, also shown on right-click.
     @ViewBuilder var actions: some View {
+        Button("Edit…") { model.edit(task) }
         Button("Start focus") { model.startFocus(on: task) }.disabled(done)
         Picker("Priority", selection: Binding(get: { task.priority }, set: { model.setPriority(task, $0) })) {
             ForEach(Priority.levels, id: \.self) { Text($0.label).tag($0) }

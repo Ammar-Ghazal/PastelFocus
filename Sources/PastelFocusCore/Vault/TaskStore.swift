@@ -235,6 +235,63 @@ public final class TaskStore {
         }
     }
 
+    /// Saves an edit made in the task editor. Only the fields the user changed (`edited` vs the
+    /// `original` the editor opened with) are written, onto the line as it is now, so changes Hermes
+    /// made meanwhile (say, a new session count) are kept. Notes are the plain bullets indented under
+    /// the task. Returns the saved task.
+    @discardableResult
+    public func apply(_ id: String, from original: TaskItem, to edited: TaskItem, actor: Actor) throws -> TaskItem {
+        guard let found = find(id) else { throw SafeFileError.lineNotFound("task 🆔 \(id)") }
+        let url = config.url(forRelative: found.file)
+        let now = clock.now(), day = today
+        var before = found, after = found
+        try SafeFile.edit(url) { lines in
+            guard let idx = lines.firstIndex(where: { TaskLineParser.parse($0)?.taskID == id }),
+                  var t = TaskLineParser.parse(lines[idx], file: found.file, lineIndex: idx) else {
+                throw SafeFileError.lineNotFound("task 🆔 \(id)")
+            }
+            // Notes: the run of plain bullets right under the line (as `parseFile` reads them).
+            var end = idx + 1
+            while end < lines.count, Self.indentWidth(lines[end]) > Self.indentWidth(lines[idx]),
+                  !TaskLineParser.isTaskLine(lines[end]), lines[end].trimmingCharacters(in: .whitespaces).hasPrefix("- ") { end += 1 }
+            let noteIndent = end > idx + 1 ? String(lines[idx + 1].prefix { $0 == " " || $0 == "\t" }) : t.indent + "    "
+            t.notes = lines[(idx + 1)..<end].map { String($0.trimmingCharacters(in: .whitespaces).dropFirst(2)) }
+            before = t
+
+            if edited.description != original.description {
+                t.description = edited.description
+                // The legacy `**P1 · 90 min**` marker is gone once the text is rewritten, so write the
+                // priority as an emoji instead.
+                if TaskLineParser.stripLegacyMarker(t.description) == t.description { t.priorityFromLegacy = false }
+            }
+            if edited.status != original.status {
+                t.status = edited.status
+                t.completed = edited.status == .done ? (t.completed ?? day) : nil
+            }
+            if edited.priority != original.priority { t.priority = edited.priority; t.priorityFromLegacy = false }
+            if edited.estimateSessions != original.estimateSessions { t.estimateSessions = edited.estimateSessions }
+            if edited.scheduled != original.scheduled { t.scheduled = edited.scheduled }
+            if edited.due != original.due { t.due = edited.due }
+            if edited.start != original.start { t.start = edited.start }
+            if edited.notes != original.notes { t.notes = edited.notes.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+
+            lines[idx] = TaskLineParser.serialize(t)
+            if t.notes != before.notes {
+                lines.replaceSubrange((idx + 1)..<end, with: t.notes.map { noteIndent + "- " + $0 })
+            }
+            after = t
+        }
+        var newEvents = Self.diff(old: [before], new: [after], at: now, actor: actor, defaultDay: effectiveDay)
+        if before.due != after.due { newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "due", old: before.due, new: after.due, actor: actor)) }
+        if before.start != after.start { newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "start", old: before.start, new: after.start, actor: actor)) }
+        if before.notes != after.notes {
+            newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "notes", old: before.notes.joined(separator: "\n"),
+                                       new: after.notes.joined(separator: "\n"), actor: actor))
+        }
+        for e in newEvents { try events.append(e, at: now) }
+        return after
+    }
+
     /// What `delete` removed, so it can be put back (Undo).
     public struct DeletedTask: Equatable, Sendable {
         public var task: TaskItem

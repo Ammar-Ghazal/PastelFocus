@@ -51,6 +51,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? png.write(to: dir.appendingPathComponent("\(name).png"))
             }
         }
+        // Windows with native controls (text fields, pickers), which ImageRenderer can't draw: lay them out
+        // in an offscreen window that is never shown, and capture the view itself.
+        func saveWindow<V: View>(_ name: String, size: CGSize, _ view: V) {
+            let host = NSHostingView(rootView: Themed { view }.environmentObject(model))
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled], backing: .buffered, defer: false)
+            w.contentView = host
+            host.layoutSubtreeIfNeeded()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("\(name).png"))
+            }
+        }
+        if var demo = TaskLineParser.parse("- [/] Practice a mock interview — 45 min with a timer #career #learning [est:: 2] [sessions:: 1] 🔺 📅 2026-10-10 🆔 demo",
+                                           file: "Daily Plans/2026-10-08.md") {
+            demo.notes = ["Use the STAR outline", "Record it"]
+            saveWindow("task-editor", size: CGSize(width: 460, height: 900), TaskEditorView(original: demo, close: {}))
+        }
         // One dark and one light combo per theme, plus the shared detail views in the default theme.
         for def_ in ThemeCatalog.all {
             for p in [def_.palettes.first { $0.isDark }, def_.palettes.first { !$0.isDark }].compactMap({ $0 }) {
