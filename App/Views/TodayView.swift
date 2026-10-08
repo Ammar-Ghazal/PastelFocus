@@ -189,11 +189,14 @@ struct TaskRow: View {
             Spacer()
             if task.priority == .high, !done { TagChip(text: "High") }
             else if let c = task.isLater ? "Later" : task.category?.capitalized { TagChip(text: c) }
-            if highlighted && !done {
-                Button { model.startFocus(on: task) } label: {
-                    Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.accent).frame(width: 28, height: 28)
-                }.buttonStyle(.plain).help("Start focus")
-            } else if snapshot {
+            // Shown on hover (always on the highlighted row). The slot is kept when hidden so chips don't shift.
+            let showPlay = !done && (hover || highlighted)
+            Button { model.startFocus(on: task) } label: {
+                Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.accent).frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain).help("Start focus")
+            .opacity(showPlay ? 1 : 0).allowsHitTesting(showPlay)
+            if snapshot {
                 Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary).frame(width: 28)
             } else {
                 Menu {
