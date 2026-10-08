@@ -123,6 +123,24 @@ public struct TagRegistry: Equatable, Sendable {
         tags[i].name = n
     }
 
+    /// Puts `names` (some of the tags, e.g. the ones shown as Today pills) in this order, in the
+    /// places they already hold, so tags left out keep their positions. Unknown names are ignored.
+    public mutating func reorder(_ names: [String]) {
+        var wanted: [String] = []
+        for n in names.map(Self.normalize) where tag(named: n) != nil && !wanted.contains(n) { wanted.append(n) }
+        let positions = tags.indices.filter { wanted.contains(tags[$0].name) }
+        let defs = wanted.compactMap { tag(named: $0) }
+        for (p, d) in zip(positions, defs) { tags[p] = d }
+    }
+
+    /// List-style move (Settings → Tags): the tags at `source` go before the tag now at `destination`.
+    public mutating func move(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let moving = source.filter { tags.indices.contains($0) }.map { tags[$0] }
+        var rest = tags.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+        rest.insert(contentsOf: moving, at: min(rest.count, destination - source.filter { $0 < destination }.count))
+        tags = rest
+    }
+
     public mutating func remove(_ name: String) {
         if let i = index(name) { tags.remove(at: i) }
     }
@@ -136,7 +154,7 @@ public struct TagRegistry: Equatable, Sendable {
 
     public func markdown() -> String {
         var lines = ["# PastelFocus Tags", "",
-                     "_Managed in PastelFocus → Settings → Tags. The first tag on a task line decides the plant it grows (#later marks priority and is skipped). Hermes: reuse these tags when writing tasks; new tags are added here automatically._",
+                     "_Managed in PastelFocus → Settings → Tags. The first tag on a task line decides the plant it grows (#later marks priority and is skipped). Row order is the order of the tag pills in the Today panel. Hermes: reuse these tags when writing tasks; new tags are added here automatically._",
                      "", "| Tag | Slot | Theme overrides |", "| --- | --- | --- |"]
         for t in tags {
             let o = t.overrides.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value.letter)" }.joined(separator: ", ")

@@ -4,7 +4,10 @@ import PastelFocusCore
 import ServiceManagement
 import SwiftUI
 
-enum TaskFilter: String, CaseIterable { case all = "All", focus = "Focus", later = "Later", done = "Done" }
+/// Today pills: All, one per tag (in the user's order), Done.
+enum TaskFilter: Hashable {
+    case all, tag(String), done
+}
 
 /// Values that change every second while a session runs. Kept out of `AppModel` so only the
 /// Focus panel and the menu-bar label redraw each second, not the Today list or the garden.
@@ -184,6 +187,7 @@ final class AppModel: ObservableObject {
         insights = c.insights
         garden = c.garden()
         tags = c.tagRegistry
+        if case .tag(let n) = filter, !pillTags.contains(n) { filter = .all } // its last task went away
         // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
         todayFocusedMin = c.todayTotals().rollup.focusedS / 60
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
@@ -197,9 +201,20 @@ final class AppModel: ObservableObject {
         switch f {
         case .all: return tasks
         case .done: return tasks.filter { $0.status == .done }
-        case .later: return tasks.filter(\.isLater)
-        case .focus: return tasks.filter { $0.status.isOpen && ($0.tags.contains { $0.lowercased() == "focus" } || $0.priority >= .high) }
+        case .tag(let n): return tasks.filter { $0.tags.contains { $0.lowercased() == n } }
         }
+    }
+
+    /// Tags on today's tasks, in the order of the tag list (Tags.md), which the user sets by dragging.
+    var pillTags: [String] {
+        let used = Set(tasks.flatMap { $0.tags.map { $0.lowercased() } })
+        return tags.tags.map(\.name).filter(used.contains)
+    }
+
+    /// Saves the pill order the user dragged (tags not shown keep their places in the list).
+    func reorderPills(_ names: [String]) {
+        guard names != pillTags else { return }
+        changeTags { try $0.updateTags { $0.reorder(names) } }
     }
 
     func count(_ f: TaskFilter) -> Int { tasks(for: f).count }
