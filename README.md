@@ -142,7 +142,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | --- | --- |
 | `TaskLineParserTests` | Tasks-plugin fields, round-trip, legacy lines, IDs |
 | `TaskSortTests` | Four priorities round-trip; Today order by priority, name and tag |
-| `TaskStoreTests` | Scan, Today filter, ID stamping, edits + events, create, outside-edit diff, Problems.md, concurrent-write conflict |
+| `TaskStoreTests` | Scan, Today filter, ID stamping, edits + events, create, delete + undo, outside-edit diff, Problems.md, concurrent-write conflict |
 | `FocusEngineTests` | Completion, pause/resume, stop, paused-out, sleep, cycle, restart restore, recorder output |
 | `InboxTests` | Command parsing, apply + tick results, focus commands, header |
 | `AnalyticsTests` | Wilson interval, thresholds, focus span, category, fatigue, estimates, postponed, reports |

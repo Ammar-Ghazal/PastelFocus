@@ -98,6 +98,24 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertTrue(text.contains("## Today's task list\n\n- [ ] First task"))
     }
 
+    func testDeleteRemovesLineAndNotesThenRestores() throws {
+        let url = config.dailyNote("2026-10-06")
+        let before = SafeFile.readLines(url)
+        let removed = try store.delete("r7q2", actor: .you)
+        XCTAssertEqual(removed.lines, ["- [ ] Finalize resume #career ⏫ [est:: 3] 🆔 r7q2", "    - Use the SWE template"])
+        XCTAssertNil(store.find("r7q2"))
+        let after = SafeFile.readLines(url)
+        XCTAssertEqual(after.count, before.count - 2)
+        XCTAssertTrue(after.contains("- [ ] Old legacy task without id"), "neighbouring lines stay")
+        XCTAssertEqual(store.events.readAll().last?.type, .deleted)
+
+        try store.restore(removed, actor: .you)
+        XCTAssertEqual(SafeFile.readLines(url), before, "Undo puts the lines back exactly")
+        XCTAssertEqual(store.find("r7q2")?.notes, ["Use the SWE template"])
+        try store.restore(removed, actor: .you) // already back: no duplicate
+        XCTAssertEqual(SafeFile.readLines(url), before)
+    }
+
     func testDiffDetectsExternalEdits() {
         let old = store.scan().tasks
         var new = old

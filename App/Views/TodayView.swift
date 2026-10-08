@@ -199,15 +199,7 @@ struct TaskRow: View {
             if snapshot {
                 Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary).frame(width: 28)
             } else {
-                Menu {
-                    Button("Start focus") { model.startFocus(on: task) }.disabled(done)
-                    Picker("Priority", selection: Binding(get: { task.priority }, set: { model.setPriority(task, $0) })) {
-                        ForEach(Priority.levels, id: \.self) { Text($0.label).tag($0) }
-                        Text("None").tag(Priority.none)
-                    }
-                    Button("Move to Later") { model.moveToLater(task) }.disabled(done || task.isLater)
-                    Button("Open in Obsidian") { model.openInObsidian(task) }
-                } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
+                Menu { actions } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
             }
         }
@@ -215,8 +207,24 @@ struct TaskRow: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(highlighted && !done ? theme.highlight : (hover ? Color.white.opacity(0.035) : .clear)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(highlighted && !done ? theme.accent.opacity(0.2) : .clear))
         .onHover { h in withAnimation(.easeOut(duration: 0.14)) { hover = h } }
+        .contextMenu { actions }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .none ? "" : ", \(task.priority.label.lowercased()) priority")")
+    }
+}
+
+extension TaskRow {
+    /// The ⋯ menu, also shown on right-click.
+    @ViewBuilder var actions: some View {
+        Button("Start focus") { model.startFocus(on: task) }.disabled(done)
+        Picker("Priority", selection: Binding(get: { task.priority }, set: { model.setPriority(task, $0) })) {
+            ForEach(Priority.levels, id: \.self) { Text($0.label).tag($0) }
+            Text("None").tag(Priority.none)
+        }
+        Button("Move to Later") { model.moveToLater(task) }.disabled(done || task.isLater)
+        Button("Open in Obsidian") { model.openInObsidian(task) }
+        Divider()
+        Button("Delete", role: .destructive) { model.delete(task) }
     }
 }
 

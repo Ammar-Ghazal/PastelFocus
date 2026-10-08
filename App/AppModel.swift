@@ -254,6 +254,22 @@ final class AppModel: ObservableObject {
         publish()
     }
 
+    /// Removes the task's line from the vault, with Undo.
+    func delete(_ t: TaskItem) {
+        guard let id = t.taskID else { return }
+        do {
+            var removed: TaskStore.DeletedTask?
+            try coordinator.perform { removed = try $0.delete(id, actor: .you) }
+            if selectedTaskID == id { selectedTaskID = nil }
+            toast = UndoToast(text: "Deleted \"\(t.title)\"") { [weak self] in
+                guard let self, let removed else { return }
+                try? self.coordinator.perform { try $0.restore(removed, actor: .you) }
+                self.publish()
+            }
+        } catch { toast = UndoToast(text: "\(error)", undo: {}) }
+        publish()
+    }
+
     func moveToLater(_ t: TaskItem) {
         guard let id = t.taskID else { return }
         try? coordinator.perform { try $0.addTag(id, "later", actor: .you) }

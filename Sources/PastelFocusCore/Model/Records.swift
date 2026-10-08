@@ -65,7 +65,7 @@ public struct SessionRecord: Codable, Sendable, Equatable, Identifiable {
 }
 
 public enum TaskEventType: String, Codable, Sendable {
-    case created, edited, rescheduled, completed, reopened, cancelled, archived
+    case created, edited, rescheduled, completed, reopened, cancelled, archived, deleted
     case priorityChanged = "priority_changed"
     case estimateChanged = "estimate_changed"
     case sessionLinked = "session_linked"
