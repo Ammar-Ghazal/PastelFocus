@@ -62,6 +62,7 @@ final class AppModel: ObservableObject {
     private var minuteTimer: Timer?
     private var hotKeys: HotKeys?
     let notifier = Notifier()
+    private let editors = TaskEditorWindows()
     private var sleepStart: Date?
     private var refreshPending = false
     private var bag: Set<AnyCancellable> = []
@@ -252,6 +253,19 @@ final class AppModel: ObservableObject {
         guard let id = t.taskID else { return }
         try? coordinator.perform { try $0.setPriority(id, p, actor: .you) }
         publish()
+    }
+
+    /// Opens the task in its own editor window.
+    func edit(_ t: TaskItem) { editors.open(t, model: self) }
+
+    /// Saves the editor's changes (only the fields changed there). Returns an error message, or nil.
+    func saveEdit(_ original: TaskItem, _ edited: TaskItem) -> String? {
+        guard let id = original.taskID else { return "This task has no 🆔 yet" }
+        do {
+            try coordinator.perform { try $0.apply(id, from: original, to: edited, actor: .you) }
+            publish()
+            return nil
+        } catch { return "\(error)" }
     }
 
     /// Removes the task's line from the vault, with Undo.

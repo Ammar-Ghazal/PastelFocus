@@ -120,10 +120,11 @@ public final class Coordinator {
         problems = r.problems
     }
 
-    /// Runs an app-initiated change, then resyncs and updates the generated files.
+    /// Runs an app-initiated change, then resyncs and updates the generated files (and the tag list).
     public func perform(_ change: (TaskStore) throws -> Void) rethrows {
         try change(store)
         resync()
+        syncTags() // a new tag typed in the editor joins the list straight away
         writeNow()
     }
 
