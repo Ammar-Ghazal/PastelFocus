@@ -42,7 +42,8 @@ public enum TaskLineParser {
         }
         for match in extract(priorityField, from: &text) {
             switch match[1] {
-            case "🔺", "⏫": item.priority = .high
+            case "🔺": item.priority = .urgent
+            case "⏫": item.priority = .high
             case "🔼": item.priority = .medium
             case "🔽", "⏬": item.priority = .low
             default: break

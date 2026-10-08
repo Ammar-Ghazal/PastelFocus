@@ -93,6 +93,13 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 TextField("NSDR audio (file path or link)", text: $settings.nsdrAudio)
             }
+            Section("Today list") {
+                Picker("Sort tasks by", selection: $settings.taskSort) {
+                    ForEach(TaskSort.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                Text("Unfinished tasks come first, then tasks moved to Later, then finished ones. Priority order is Urgent, High, Medium, no priority, Low; the other sorts use priority to break ties.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Night Garden") {
                 Stepper("A good day is \(GoodDay.label(settings.goodDayMinutes)) of focus", value: $settings.goodDayMinutes,
                         in: GoodDay.range, step: GoodDay.step)

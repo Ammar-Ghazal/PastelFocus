@@ -64,11 +64,13 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
     - notes as indented sub-bullets
 ```
 
+Priority: 🔺 urgent, ⏫ high, 🔼 medium, 🔽 low (⏬ is read as low); no emoji means no priority. The Today list is sorted by priority by default (urgent, high, medium, none, low, as in the Tasks plugin); Settings → General → Today list can sort by task name or tag instead. Unfinished tasks always come first, then `#later` tasks, then finished ones.
+
 Legacy Hermes lines (`- [ ] **P1 · 90 min** Title — detail`) are still read: P1/P2/P3 → priority, minutes → estimated sessions.
 
 ### Inbox commands
 
-`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id high|medium|low|none` · `estimate 🆔 id N` · `complete|reopen|cancel|later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …`, with an Undo toast in the app.
+`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `estimate 🆔 id N` · `complete|reopen|cancel|later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …`, with an Undo toast in the app.
 
 ## Analytics and suggestions
 
@@ -139,6 +141,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | Test file | Covers |
 | --- | --- |
 | `TaskLineParserTests` | Tasks-plugin fields, round-trip, legacy lines, IDs |
+| `TaskSortTests` | Four priorities round-trip; Today order by priority, name and tag |
 | `TaskStoreTests` | Scan, Today filter, ID stamping, edits + events, create, outside-edit diff, Problems.md, concurrent-write conflict |
 | `FocusEngineTests` | Completion, pause/resume, stop, paused-out, sleep, cycle, restart restore, recorder output |
 | `InboxTests` | Command parsing, apply + tick results, focus commands, header |

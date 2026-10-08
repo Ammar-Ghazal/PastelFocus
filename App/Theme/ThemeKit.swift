@@ -70,7 +70,7 @@ struct Theme {
     /// Tag colour by category/priority word.
     func tagColor(_ tag: String) -> Color {
         switch tag.lowercased() {
-        case "high": tagHigh
+        case "urgent", "high": tagHigh
         case "focus", "coding", "career": tagFocus
         case "health": tagHealth
         case "later": tagLater
