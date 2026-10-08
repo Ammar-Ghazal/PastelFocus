@@ -235,6 +235,50 @@ public final class TaskStore {
         }
     }
 
+    /// What `delete` removed, so it can be put back (Undo).
+    public struct DeletedTask: Equatable, Sendable {
+        public var task: TaskItem
+        /// Vault-relative file and the index of the task line when it was removed.
+        public var file: String
+        public var lineIndex: Int
+        /// The task line plus everything indented under it (notes and subtasks).
+        public var lines: [String]
+    }
+
+    /// Removes a task's line, and the notes and subtasks indented under it, from its note.
+    @discardableResult
+    public func delete(_ id: String, actor: Actor, reason: String? = nil) throws -> DeletedTask {
+        guard let found = find(id) else { throw SafeFileError.lineNotFound("task 🆔 \(id)") }
+        let url = config.url(forRelative: found.file)
+        var removed = DeletedTask(task: found, file: found.file, lineIndex: found.lineIndex, lines: [])
+        try SafeFile.edit(url) { lines in
+            guard let idx = lines.firstIndex(where: { TaskLineParser.parse($0)?.taskID == id }) else {
+                throw SafeFileError.lineNotFound("task 🆔 \(id)")
+            }
+            let indent = Self.indentWidth(lines[idx])
+            var end = idx + 1
+            while end < lines.count, !lines[end].trimmingCharacters(in: .whitespaces).isEmpty, Self.indentWidth(lines[end]) > indent { end += 1 }
+            removed.lineIndex = idx
+            removed.lines = Array(lines[idx..<end])
+            lines.removeSubrange(idx..<end)
+        }
+        try events.append(TaskEvent(at: clock.now(), taskId: id, type: .deleted, old: found.description, actor: actor, reason: reason), at: clock.now())
+        return removed
+    }
+
+    /// Puts a deleted task back where it was (or at the end of the note if that has since shrunk).
+    public func restore(_ d: DeletedTask, actor: Actor) throws {
+        guard let id = d.task.taskID, find(id) == nil else { return }
+        try SafeFile.edit(config.url(forRelative: d.file)) { lines in
+            lines.insert(contentsOf: d.lines, at: min(d.lineIndex, lines.count))
+        }
+        try events.append(TaskEvent(at: clock.now(), taskId: id, type: .created, new: d.task.description, actor: actor, reason: "restored"), at: clock.now())
+    }
+
+    static func indentWidth(_ line: String) -> Int {
+        line.prefix { $0 == " " || $0 == "\t" }.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+    }
+
     /// Sets `[sessions:: n]` to the number of completed focus sessions linked to the task.
     public func setActualSessions(_ id: String, _ n: Int) throws {
         try mutate(id, actor: .app) { t in
