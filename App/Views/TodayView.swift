@@ -85,7 +85,7 @@ struct TodayView: View {
     }
 
     @ViewBuilder private var list: some View {
-        if model.tasks.isEmpty {
+        if model.tasks.isEmpty && model.upcoming.isEmpty {
             VStack(spacing: 12) {
                 Spacer()
                 SpriteView(rows: Sprite.catMascot, px: 4)
@@ -99,6 +99,10 @@ struct TodayView: View {
         } else if snapshot {
             VStack(spacing: 4) {
                 ForEach(model.filteredTasks.prefix(7)) { t in TaskRow(task: t, highlighted: t.taskID == model.highlightedID) }
+                ForEach(model.filteredUpcoming) { u in
+                    DayHeader(title: u.title)
+                    ForEach(u.tasks) { t in TaskRow(task: t, highlighted: false) }
+                }
                 Spacer(minLength: 0)
             }
             .frame(minHeight: 0, maxHeight: .infinity, alignment: .top).clipped() // shrinks like the scroll view
@@ -109,8 +113,15 @@ struct TodayView: View {
                         TaskRow(task: t, highlighted: t.taskID == model.highlightedID)
                             .transition(.asymmetric(insertion: .offset(y: -6).combined(with: .opacity), removal: .opacity))
                     }
+                    // Later days' one-time tasks, a heading per day.
+                    ForEach(model.filteredUpcoming) { u in
+                        DayHeader(title: u.title)
+                        ForEach(u.tasks) { t in
+                            TaskRow(task: t, highlighted: false).transition(.opacity)
+                        }
+                    }
                 }
-                .animation(.easeOut(duration: 0.2), value: model.filteredTasks.map(\.id))
+                .animation(.easeOut(duration: 0.2), value: model.filteredTasks.map(\.id) + model.filteredUpcoming.flatMap { $0.tasks.map(\.id) })
             }
         }
     }
@@ -144,6 +155,18 @@ struct TodayView: View {
     }
 }
 
+/// Heading over one later day's tasks in the Today list.
+private struct DayHeader: View {
+    @Environment(\.theme) var theme
+    let title: String
+    var body: some View {
+        Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 2)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 struct TaskRow: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
@@ -165,6 +188,7 @@ struct TaskRow: View {
                     .foregroundStyle(done ? theme.textTertiary : theme.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 6) {
+                    if task.isRepeating { Image(systemName: "repeat").help("Repeats \(task.recurrence ?? "")") }
                     if let s = task.subtitle { Text(s).lineLimit(1) }
                     if let e = task.estimateSessions { Text("· \(task.actualSessions ?? 0)/\(e) sessions") }
                 }

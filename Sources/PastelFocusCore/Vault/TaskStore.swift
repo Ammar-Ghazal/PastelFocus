@@ -107,6 +107,18 @@ public final class TaskStore {
         }
     }
 
+    /// Open one-time tasks planned for a later day, soonest first. Repeating tasks are left out, so
+    /// a routine's future days never fill the list; undated Backlog tasks are left out too.
+    public func upcomingTasks(_ all: [TaskItem]) -> [TaskItem] {
+        let day = today
+        return all.compactMap { t -> (String, TaskItem)? in
+            guard t.indent.isEmpty || t.taskID != nil, t.status.isOpen, !t.isRepeating,
+                  let d = effectiveDay(t), d > day else { return nil }
+            return (d, t)
+        }
+        .enumerated().sorted { ($0.element.0, $0.offset) < ($1.element.0, $1.offset) }.map(\.element.1)
+    }
+
     // MARK: Writing
 
     /// Gives every task without a 🆔 a fresh one. Returns how many lines were stamped.
@@ -273,6 +285,7 @@ public final class TaskStore {
             if edited.scheduled != original.scheduled { t.scheduled = edited.scheduled }
             if edited.due != original.due { t.due = edited.due }
             if edited.start != original.start { t.start = edited.start }
+            if edited.recurrence != original.recurrence { t.recurrence = edited.recurrence }
             if edited.notes != original.notes { t.notes = edited.notes.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
 
             lines[idx] = TaskLineParser.serialize(t)

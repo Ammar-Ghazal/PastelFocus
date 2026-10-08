@@ -79,6 +79,8 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     public var due: String?
     public var start: String?
     public var completed: String?
+    /// Obsidian Tasks recurrence rule (`🔁 every day`), without the emoji.
+    public var recurrence: String?
     public var notes: [String]
 
     /// Vault-relative path of the file holding the line.
@@ -92,7 +94,7 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
                 priority: Priority = .none, priorityFromLegacy: Bool = false,
                 estimateSessions: Int? = nil, actualSessions: Int? = nil,
                 created: String? = nil, scheduled: String? = nil, due: String? = nil,
-                start: String? = nil, completed: String? = nil, notes: [String] = [],
+                start: String? = nil, completed: String? = nil, recurrence: String? = nil, notes: [String] = [],
                 file: String = "", lineIndex: Int = 0, indent: String = "") {
         self.taskID = taskID
         self.status = status
@@ -106,6 +108,7 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
         self.due = due
         self.start = start
         self.completed = completed
+        self.recurrence = recurrence
         self.notes = notes
         self.file = file
         self.lineIndex = lineIndex
@@ -123,6 +126,9 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     }
 
     public var isLater: Bool { tags.contains { $0.lowercased() == "later" } }
+
+    /// A routine (🔁). Only its current line is listed, never its future days.
+    public var isRepeating: Bool { recurrence != nil }
 
     /// Description without tags or the legacy marker, split into title and subtitle at " — ".
     public var title: String { displayParts.title }

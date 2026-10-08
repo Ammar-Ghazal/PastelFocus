@@ -49,6 +49,7 @@ struct TaskEditorView: View {
     @State private var scheduled: String?
     @State private var due: String?
     @State private var start: String?
+    @State private var recurrence: String
     @State private var notes: String
     @State private var newTag = ""
     @State private var error: String?
@@ -65,6 +66,7 @@ struct TaskEditorView: View {
         _scheduled = State(initialValue: original.scheduled)
         _due = State(initialValue: original.due)
         _start = State(initialValue: original.start)
+        _recurrence = State(initialValue: original.recurrence ?? "")
         _notes = State(initialValue: original.notes.joined(separator: "\n"))
     }
 
@@ -100,12 +102,20 @@ struct TaskEditorView: View {
                     }
                     LabeledContent("Sessions done", value: "\(original.actualSessions ?? 0)")
                 }
-                Section("Dates") {
+                Section {
                     DayField(label: "Scheduled", day: $scheduled, placeholder: noteDay.map { "From its note (\($0))" } ?? "Not set")
                     DayField(label: "Due", day: $due)
                     DayField(label: "Starts", day: $start)
+                    LabeledContent("Repeats") {
+                        TextField("Repeats", text: $recurrence, prompt: Text("Never, or e.g. every day")).labelsHidden()
+                            .multilineTextAlignment(.trailing)
+                    }
                     if let c = original.created { LabeledContent("Created", value: c) }
                     if let c = original.completed { LabeledContent("Completed", value: c) }
+                } header: {
+                    Text("Dates")
+                } footer: {
+                    Text("Repeating tasks show only their current day, not upcoming ones.").font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
                     TextEditor(text: $notes).font(.system(size: 13)).frame(minHeight: 70)
@@ -209,6 +219,12 @@ struct TaskEditorView: View {
         edited.scheduled = scheduled
         edited.due = due
         edited.start = start
+        let rule = recurrence.replacingOccurrences(of: "🔁", with: "").trimmingCharacters(in: .whitespaces)
+        guard rule.range(of: #"^[A-Za-z0-9,! ]*$"#, options: .regularExpression) != nil else {
+            error = "Repeats takes words like \"every day\" or \"every week on Monday\"."
+            return
+        }
+        edited.recurrence = rule.isEmpty ? nil : rule
         edited.notes = notes.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         if let e = model.saveEdit(original, edited) { error = e } else { close() }
     }

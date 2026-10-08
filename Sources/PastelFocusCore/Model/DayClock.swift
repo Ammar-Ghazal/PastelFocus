@@ -68,6 +68,18 @@ public struct DayCalendar: Sendable {
         return addDays(-back, to: day(date))
     }
 
+    /// "Tomorrow", a weekday within the coming week ("Friday"), then a short date ("Mon, Oct 19").
+    public func relativeDayTitle(_ day: String, from today: String) -> String {
+        guard let d = startOfDay(day), let t = startOfDay(today) else { return day }
+        let ahead = calendar.dateComponents([.day], from: t, to: d).day ?? 0
+        if ahead == 1 { return "Tomorrow" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.timeZone = timeZone
+        f.dateFormat = ahead > 1 && ahead < 7 ? "EEEE" : "EEE, MMM d"
+        return f.string(from: d)
+    }
+
     public func longDayTitle(_ day: String) -> String {
         guard let d = startOfDay(day) else { return day }
         let f = DateFormatter()

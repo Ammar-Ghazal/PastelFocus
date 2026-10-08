@@ -26,6 +26,16 @@ final class TaskLineParserTests: XCTestCase {
         XCTAssertEqual(t.completed, "2026-10-07")
     }
 
+    func testRecurrenceIsReadAndKept() throws {
+        let t = try XCTUnwrap(TaskLineParser.parse("- [ ] Stretch 🔁 every week on Monday, Friday #health ⏳ 2026-10-08 🆔 st01"))
+        XCTAssertEqual(t.recurrence, "every week on Monday, Friday")
+        XCTAssertTrue(t.isRepeating)
+        XCTAssertEqual(t.title, "Stretch")
+        XCTAssertEqual(t.tags, ["health"])
+        XCTAssertEqual(TaskLineParser.serialize(t), "- [ ] Stretch #health 🔁 every week on Monday, Friday ⏳ 2026-10-08 🆔 st01")
+        XCTAssertFalse(try XCTUnwrap(TaskLineParser.parse("- [ ] Once 🆔 on01")).isRepeating)
+    }
+
     func testLegacyHermesLine() throws {
         let line = "- [ ] **P1 · 90 min** Finalize resume — make one accurate version. **In progress as of about 13:10.**"
         let t = try XCTUnwrap(TaskLineParser.parse(line))

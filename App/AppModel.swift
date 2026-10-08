@@ -9,6 +9,14 @@ enum TaskFilter: Hashable {
     case all, tag(String), done
 }
 
+/// One later day's one-time tasks, shown under today's in the Today list.
+struct UpcomingDay: Identifiable, Equatable {
+    let day: String
+    let title: String
+    var tasks: [TaskItem]
+    var id: String { day }
+}
+
 /// Values that change every second while a session runs. Kept out of `AppModel` so only the
 /// Focus panel and the menu-bar label redraw each second, not the Today list or the garden.
 @MainActor
@@ -31,6 +39,8 @@ final class AppModel: ObservableObject {
     private(set) var coordinator: Coordinator
 
     @Published var tasks: [TaskItem] = []
+    /// Open one-time tasks planned for later days (never a routine's future days).
+    @Published var upcoming: [UpcomingDay] = []
     @Published var filter: TaskFilter = .all
     @Published var phase: FocusPhase = .idle
     @Published var plannedS = 25 * 60
@@ -176,6 +186,10 @@ final class AppModel: ObservableObject {
     func publish() {
         let c = coordinator
         tasks = settings.taskSort.sorted(c.todayTasks)
+        let byDay = Dictionary(grouping: c.upcomingTasks) { c.store.effectiveDay($0) ?? "" }
+        upcoming = byDay.keys.sorted().map { d in
+            UpcomingDay(day: d, title: c.calendar.relativeDayTitle(d, from: c.today), tasks: settings.taskSort.sorted(byDay[d] ?? []))
+        }
         problemsCount = c.problems.count
         phase = c.engine.phase
         remainingS = c.engine.remainingS
@@ -196,6 +210,7 @@ final class AppModel: ObservableObject {
     }
 
     var filteredTasks: [TaskItem] { tasks(for: filter) }
+    var filteredUpcoming: [UpcomingDay] { upcoming(for: filter) }
 
     func tasks(for f: TaskFilter) -> [TaskItem] {
         switch f {
@@ -205,9 +220,24 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Tags on today's tasks, in the order of the tag list (Tags.md), which the user sets by dragging.
+    /// Upcoming days under a pill. Done shows only today's finished tasks.
+    func upcoming(for f: TaskFilter) -> [UpcomingDay] {
+        switch f {
+        case .all: return upcoming
+        case .done: return []
+        case .tag(let n):
+            return upcoming.compactMap { u in
+                var u = u
+                u.tasks = u.tasks.filter { $0.tags.contains { $0.lowercased() == n } }
+                return u.tasks.isEmpty ? nil : u
+            }
+        }
+    }
+
+    /// Tags on listed tasks (today's and upcoming), in the order of the tag list (Tags.md), which
+    /// the user sets by dragging.
     var pillTags: [String] {
-        let used = Set(tasks.flatMap { $0.tags.map { $0.lowercased() } })
+        let used = Set((tasks + upcoming.flatMap(\.tasks)).flatMap { $0.tags.map { $0.lowercased() } })
         return tags.tags.map(\.name).filter(used.contains)
     }
 
@@ -217,7 +247,7 @@ final class AppModel: ObservableObject {
         changeTags { try $0.updateTags { $0.reorder(names) } }
     }
 
-    func count(_ f: TaskFilter) -> Int { tasks(for: f).count }
+    func count(_ f: TaskFilter) -> Int { tasks(for: f).count + upcoming(for: f).reduce(0) { $0 + $1.tasks.count } }
 
     /// The first unfinished urgent or high-priority task in the list gets the highlighted row.
     var highlightedID: String? { tasks.first { $0.status.isOpen && $0.priority >= .high }?.taskID }

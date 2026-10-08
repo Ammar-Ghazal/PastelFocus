@@ -45,6 +45,20 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(Set(ids), ["Finalize resume", "Old legacy task without id", "Pick target countries"])
     }
 
+    func testUpcomingListsLaterOneTimeTasksSoonestFirst() {
+        write("""
+        - [ ] Morning routine 🔁 every day 🆔 rt01
+        - [ ] Evening call 🆔 ev01
+        - [x] Already done 🆔 ad01 ✅ 2026-10-07
+        """, to: config.dailyNote("2026-10-08"))
+        write("- [ ] Weekly review 🔁 every week 🆔 rt02\n- [ ] Dentist 🆔 dn01\n", to: config.dailyNote("2026-10-12"))
+        let upcoming = store.upcomingTasks(store.scan().tasks)
+        // One-time tasks only, soonest first (the Backlog task is dated the 9th); no undated Backlog.
+        XCTAssertEqual(upcoming.map(\.taskID), ["ev01", "f1f1", "dn01"])
+        // Today's list is unchanged.
+        XCTAssertFalse(store.todayTasks(store.scan().tasks).contains { $0.taskID == "ev01" })
+    }
+
     func testStampMissingIDsOnlyTouchesThatLine() throws {
         let before = read(config.dailyNote("2026-10-06"))
         XCTAssertEqual(try store.stampMissingIDs(), 1)
@@ -150,6 +164,19 @@ final class TaskStoreTests: XCTestCase {
         let now = try XCTUnwrap(store.find("c4x8"))
         try store.apply("c4x8", from: now, to: now, actor: .you)
         XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-07")), lines)
+    }
+
+    func testEditorSetsAndClearsRepeat() throws {
+        let original = try XCTUnwrap(store.find("c4x8"))
+        var edited = original
+        edited.recurrence = "every day"
+        try store.apply("c4x8", from: original, to: edited, actor: .you)
+        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-07")).last, "- [ ] Pick target countries #career 🔼 🔁 every day 🆔 c4x8")
+        let repeating = try XCTUnwrap(store.find("c4x8"))
+        var cleared = repeating
+        cleared.recurrence = nil
+        try store.apply("c4x8", from: repeating, to: cleared, actor: .you)
+        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-07")).last, "- [ ] Pick target countries #career 🔼 🆔 c4x8")
     }
 
     func testEditingLegacyLineWritesPriorityEmoji() throws {

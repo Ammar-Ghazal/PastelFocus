@@ -46,6 +46,7 @@ public final class Coordinator {
 
     public var today: String { calendar.day(clock.now()) }
     public var todayTasks: [TaskItem] { store.todayTasks(tasks) }
+    public var upcomingTasks: [TaskItem] { store.upcomingTasks(tasks) }
 
     // MARK: Sync with the vault
 
