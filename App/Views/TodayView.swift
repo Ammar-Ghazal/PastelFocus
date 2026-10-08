@@ -187,7 +187,7 @@ struct TaskRow: View {
             }
             .opacity(done ? 0.58 : 1)
             Spacer()
-            if task.priority == .high, !done { TagChip(text: "High") }
+            if task.priority >= .high, !done { TagChip(text: task.priority.label) }
             else if let c = task.isLater ? "Later" : task.category?.capitalized { TagChip(text: c) }
             // Shown on hover (always on the highlighted row). The slot is kept when hidden so chips don't shift.
             let showPlay = !done && (hover || highlighted)
@@ -201,6 +201,10 @@ struct TaskRow: View {
             } else {
                 Menu {
                     Button("Start focus") { model.startFocus(on: task) }.disabled(done)
+                    Picker("Priority", selection: Binding(get: { task.priority }, set: { model.setPriority(task, $0) })) {
+                        ForEach(Priority.levels, id: \.self) { Text($0.label).tag($0) }
+                        Text("None").tag(Priority.none)
+                    }
                     Button("Move to Later") { model.moveToLater(task) }.disabled(done || task.isLater)
                     Button("Open in Obsidian") { model.openInObsidian(task) }
                 } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
@@ -212,7 +216,7 @@ struct TaskRow: View {
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(highlighted && !done ? theme.accent.opacity(0.2) : .clear))
         .onHover { h in withAnimation(.easeOut(duration: 0.14)) { hover = h } }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .high ? ", high priority" : "")")
+        .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .none ? "" : ", \(task.priority.label.lowercased()) priority")")
     }
 }
 

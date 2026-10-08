@@ -86,6 +86,7 @@ final class AppModel: ObservableObject {
         // A new good-day threshold changes the streak, landmarks and the Stats files Hermes reads.
         settings.$goodDayMinutes.dropFirst().removeDuplicates().debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
             .sink { [weak self] m in self?.coordinator.goodDayMinutes = m; self?.runNightly() }.store(in: &bag)
+        settings.$taskSort.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.publish() } }.store(in: &bag)
         settings.$logsInVault.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         settings.$vaultPath.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.rebuildCoordinator() } }.store(in: &bag)
         start()
@@ -170,7 +171,7 @@ final class AppModel: ObservableObject {
 
     func publish() {
         let c = coordinator
-        tasks = c.todayTasks
+        tasks = settings.taskSort.sorted(c.todayTasks)
         problemsCount = c.problems.count
         phase = c.engine.phase
         remainingS = c.engine.remainingS
@@ -185,7 +186,7 @@ final class AppModel: ObservableObject {
         // Same totals as Now.md and the note's summary, so the menu bar never disagrees with Hermes.
         todayFocusedMin = c.todayTotals().rollup.focusedS / 60
         if selectedTaskID == nil || !tasks.contains(where: { $0.taskID == selectedTaskID && $0.status.isOpen }) {
-            selectedTaskID = (tasks.first { $0.status.isOpen && $0.priority == .high } ?? tasks.first { $0.status.isOpen })?.taskID
+            selectedTaskID = (tasks.first { $0.status.isOpen && $0.priority >= .high } ?? tasks.first { $0.status.isOpen })?.taskID
         }
     }
 
@@ -196,14 +197,14 @@ final class AppModel: ObservableObject {
         case .all: return tasks
         case .done: return tasks.filter { $0.status == .done }
         case .later: return tasks.filter(\.isLater)
-        case .focus: return tasks.filter { $0.status.isOpen && ($0.tags.contains { $0.lowercased() == "focus" } || $0.priority == .high) }
+        case .focus: return tasks.filter { $0.status.isOpen && ($0.tags.contains { $0.lowercased() == "focus" } || $0.priority >= .high) }
         }
     }
 
     func count(_ f: TaskFilter) -> Int { tasks(for: f).count }
 
-    /// The first unfinished high-priority task gets the highlighted row.
-    var highlightedID: String? { tasks.first { $0.status.isOpen && $0.priority == .high }?.taskID }
+    /// The first unfinished urgent or high-priority task in the list gets the highlighted row.
+    var highlightedID: String? { tasks.first { $0.status.isOpen && $0.priority >= .high }?.taskID }
 
     // MARK: Tags
 
@@ -245,6 +246,12 @@ final class AppModel: ObservableObject {
         if let created = tasks.last, let s = coordinator.suggestions.evaluate(.planning(created), insights: insights, now: Date(), sessionRunning: phase != .idle) {
             present(s)
         }
+    }
+
+    func setPriority(_ t: TaskItem, _ p: Priority) {
+        guard let id = t.taskID else { return }
+        try? coordinator.perform { try $0.setPriority(id, p, actor: .you) }
+        publish()
     }
 
     func moveToLater(_ t: TaskItem) {

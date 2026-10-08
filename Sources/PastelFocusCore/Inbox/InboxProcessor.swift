@@ -39,7 +39,7 @@ public final class InboxProcessor {
     public static let header = [
         "# PastelFocus Inbox", "",
         "Hermes (or you) can add one command per line as `- [ ] <command>`. PastelFocus applies it within a second and ticks it with the result.", "",
-        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id high|medium|low|none` · `estimate 🆔 id N` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
+        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `estimate 🆔 id N` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
         "## Commands", "",
     ]
 
@@ -78,11 +78,12 @@ public final class InboxProcessor {
             cmd = .reschedule(id: try needID(), day: day)
         case "priority":
             let p: Priority
-            if rest.contains("⏫") || rest.contains("🔺") || rest.lowercased().contains("high") { p = .high }
+            if rest.contains("🔺") || rest.lowercased().contains("urgent") { p = .urgent }
+            else if rest.contains("⏫") || rest.lowercased().contains("high") { p = .high }
             else if rest.contains("🔼") || rest.lowercased().contains("medium") { p = .medium }
             else if rest.contains("🔽") || rest.lowercased().contains("low") { p = .low }
             else if rest.lowercased().contains("none") { p = .none }
-            else { throw InboxError("missing priority (high, medium, low or none)") }
+            else { throw InboxError("missing priority (urgent, high, medium, low or none)") }
             cmd = .priority(id: try needID(), p)
         case "estimate":
             let stripped = rest.replacingOccurrences(of: #"🆔\s*[A-Za-z0-9_-]+"#, with: "", options: .regularExpression)

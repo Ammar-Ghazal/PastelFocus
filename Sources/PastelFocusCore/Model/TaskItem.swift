@@ -19,14 +19,31 @@ public enum TaskStatus: String, Codable, Sendable, CaseIterable {
     public var isOpen: Bool { self == .todo || self == .inProgress }
 }
 
+/// Raw values are stored in event logs and the index, so new levels get new numbers.
 public enum Priority: Int, Codable, Sendable, Comparable, CaseIterable {
-    case none = 0, low = 1, medium = 2, high = 3
+    case none = 0, low = 1, medium = 2, high = 3, urgent = 4
 
     public static func < (a: Priority, b: Priority) -> Bool { a.rawValue < b.rawValue }
+
+    /// The four levels a task can be given, most important first (no priority is also allowed).
+    public static let levels: [Priority] = [.urgent, .high, .medium, .low]
+
+    /// Position in the Today list: urgent, high, medium, no priority, low. As in the Obsidian Tasks
+    /// plugin, a task without a priority counts as "normal", between medium and low.
+    public var sortRank: Int {
+        switch self {
+        case .urgent: return 0
+        case .high: return 1
+        case .medium: return 2
+        case .none: return 3
+        case .low: return 4
+        }
+    }
 
     /// Tasks plugin emoji. `none` has no marker.
     public var emoji: String? {
         switch self {
+        case .urgent: return "🔺"
         case .high: return "⏫"
         case .medium: return "🔼"
         case .low: return "🔽"
@@ -36,6 +53,7 @@ public enum Priority: Int, Codable, Sendable, Comparable, CaseIterable {
 
     public var label: String {
         switch self {
+        case .urgent: return "Urgent"
         case .high: return "High"
         case .medium: return "Medium"
         case .low: return "Low"
