@@ -26,31 +26,20 @@ enum Sprite {
     static let bridge = ["........", "........", ".RRRRRR.", "R.R..R.R", "R......R", "........", "........", "........"]
     static let catMascot = ["P......P", "PP....PP", "PLLLLLLP", "LKLLLLKL", "LLLppLLL", ".LLLLLL.", "..L..L..", "........"]
 
-    static func forItem(_ item: GardenItem) -> [String] {
+    static let mushroom = ["........", "..pPPp..", ".pPWPPp.", "pPPPPWPp", "...WW...", "...WW...", "..WWWW..", "........"]
+    static let cactus = ["...M....", "...M..M.", "M..M..M.", "M..MMMM.", "MMMM....", "...M....", "..tTTt..", "..tttt.."]
+    static let sunflower = ["..Y.Y...", ".YYyYY..", "YYyByYY.", ".YYyYY..", "..YMY...", "...M.M..", "..MM....", "...M...."]
+    static let berryBush = ["..mMMm..", ".mMRMMm.", "mMMMRMMm", "mRMMMMRm", ".mMMRMm.", "..mMMm..", "...TT...", "........"]
+    static let crystalCluster = ["....V...", "..V.Vv..", "..VvVv.V", ".VvVvVvV", ".vVvVvV.", "..vVvV..", "..SSSS..", ".ssssss."]
+
+    /// A garden item's sprite: plants come from their tag's slot (via `art`), the rest are fixed.
+    static func forItem(_ item: GardenItem, art: PlantArt) -> [String] {
         switch item.kind {
         case .wilted: return wilted
         case .richSoil: return soil
         case .sleepingCat: return cat
         case .ripple: return ripple
-        case .plant:
-            if item.size == .sprout { return sprout }
-            switch item.species ?? .grassTuft {
-            case .crystalPine: return crystalPine
-            case .lanternFlower: return lanternFlower
-            case .fern: return fern
-            case .blossomTree: return blossomTree
-            case .grassTuft: return grassTuft
-            }
-        }
-    }
-
-    static func forCategory(_ c: String?) -> [String] {
-        switch Species.forCategory(c) {
-        case .crystalPine: return crystalPine
-        case .lanternFlower: return lanternFlower
-        case .fern: return fern
-        case .blossomTree: return blossomTree
-        case .grassTuft: return grassTuft
+        case .plant: return item.size == .sprout ? sprout : art.sprite(forTag: item.tag)
         }
     }
 
@@ -141,6 +130,7 @@ struct IsoGeometry {
 /// waterfall move, as Core Animation layers.
 struct IsoPlotView: View {
     @Environment(\.theme) private var theme
+    @Environment(\.plantArt) private var plantArt
     @Environment(\.snapshotMode) private var snapshot
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let plot: GardenPlot
@@ -187,7 +177,7 @@ struct IsoPlotView: View {
         for item in plot.items.sorted(by: { ($0.x + $0.y, $0.x) < ($1.x + $1.y, $1.x) }) {
             let scale: CGFloat = item.size == .large ? 1.35 : item.size == .medium ? 1.15 : 1
             let c = g.centre(item.x, item.y)
-            Sprite.draw(Sprite.forItem(item), in: &ctx, anchor: CGPoint(x: c.x, y: c.y + g.tile * 0.12), px: g.px * scale,
+            Sprite.draw(Sprite.forItem(item, art: plantArt), in: &ctx, anchor: CGPoint(x: c.x, y: c.y + g.tile * 0.12), px: g.px * scale,
                         tint: item.variant == .golden ? Color(hex: 0xF8DFA1) : nil, glow: item.variant != .normal)
         }
 

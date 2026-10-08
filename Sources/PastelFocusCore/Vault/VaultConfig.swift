@@ -39,6 +39,7 @@ public struct VaultConfig: Sendable, Equatable {
     public var now: URL { appDir.appendingPathComponent("Now.md") }
     public var insights: URL { appDir.appendingPathComponent("Insights.md") }
     public var problems: URL { appDir.appendingPathComponent("Problems.md") }
+    public var tags: URL { appDir.appendingPathComponent("Tags.md") }
 
     public func dailyNote(_ day: String) -> URL { dailyDir.appendingPathComponent("\(day).md") }
 

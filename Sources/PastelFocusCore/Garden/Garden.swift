@@ -1,20 +1,5 @@
 import Foundation
 
-public enum Species: String, Codable, Sendable, CaseIterable {
-    case crystalPine, lanternFlower, fern, blossomTree, grassTuft
-
-    /// Category → species. Edit here to change the mapping.
-    public static func forCategory(_ c: String?) -> Species {
-        switch c?.lowercased() {
-        case "coding", "career": return .crystalPine
-        case "learning": return .lanternFlower
-        case "health": return .fern
-        case "personal": return .blossomTree
-        default: return .grassTuft
-        }
-    }
-}
-
 public enum PlantSize: Int, Codable, Sendable, Comparable {
     case sprout, small, medium, large
     public static func < (a: PlantSize, b: PlantSize) -> Bool { a.rawValue < b.rawValue }
@@ -34,7 +19,8 @@ public enum Variant: String, Codable, Sendable { case normal, glowing, golden }
 public struct GardenItem: Codable, Sendable, Equatable, Identifiable {
     public var id: String
     public var kind: GardenItemKind
-    public var species: Species?
+    /// The session's tag (its task's first tag); the app turns it into a plant via the tag's slot.
+    public var tag: String?
     public var size: PlantSize?
     public var variant: Variant
     public var day: String
@@ -218,14 +204,14 @@ public enum GardenBuilder {
     static func item(for s: SessionRecord, events: [TaskEvent], now: Date, calendar: DayCalendar) -> GardenItem? {
         let day = calendar.day(s.startedAt)
         switch s.kind {
-        case .nsdr: return GardenItem(id: s.id, kind: .sleepingCat, species: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
-        case .longBreak: return GardenItem(id: s.id, kind: .ripple, species: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
+        case .nsdr: return GardenItem(id: s.id, kind: .sleepingCat, tag: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
+        case .longBreak: return GardenItem(id: s.id, kind: .ripple, tag: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
         case .shortBreak: return nil
         case .focus: break
         }
         if s.outcome != .completed {
             let composted = now.timeIntervalSince(s.endedAt) > 86_400
-            return GardenItem(id: s.id, kind: composted ? .richSoil : .wilted, species: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
+            return GardenItem(id: s.id, kind: composted ? .richSoil : .wilted, tag: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
         }
         let minutes = s.focusedS / 60
         var variant = Variant.normal
@@ -234,7 +220,7 @@ public enum GardenBuilder {
         } else if s.pauses.isEmpty, minutes >= 40 {
             variant = .glowing
         }
-        return GardenItem(id: s.id, kind: .plant, species: Species.forCategory(s.category), size: .forMinutes(minutes),
+        return GardenItem(id: s.id, kind: .plant, tag: s.category?.lowercased(), size: .forMinutes(minutes),
                           variant: variant, day: day, x: 0, y: 0)
     }
 

@@ -21,6 +21,8 @@ public final class Coordinator {
     public private(set) var tasks: [TaskItem] = []
     public private(set) var insights: [Insight] = []
     public private(set) var problems: [String] = []
+    /// The tag list (PastelFocus/Tags.md): which plant slot each tag grows.
+    public private(set) var tagRegistry = TagRegistry()
     /// Focused minutes that make a good day (a user setting).
     public var goodDayMinutes = GoodDay.defaultMinutes
 
@@ -63,8 +65,52 @@ public final class Coordinator {
         problems = result.problems
         try? store.writeProblems(problems)
         if (try? inbox.process()) ?? 0 > 0 { resync() }
+        syncTags()
         writeNow()
         return external
+    }
+
+    // MARK: Tags
+
+    /// Reads Tags.md (you or Hermes may have edited it), adds any tags found on task lines that
+    /// aren't listed yet, and writes the file back only if that changed it.
+    public func syncTags() {
+        var registry = TagRegistry.parse((try? String(contentsOf: config.tags, encoding: .utf8)) ?? "")
+        registry.adopt(tasks.flatMap(\.tags))
+        tagRegistry = registry
+        _ = try? SafeFile.writeIfChanged(registry.markdown(), to: config.tags)
+    }
+
+    /// Changes the tag list and saves it.
+    public func updateTags(_ change: (inout TagRegistry) throws -> Void) throws {
+        var registry = tagRegistry
+        try change(&registry)
+        tagRegistry = registry
+        _ = try SafeFile.writeIfChanged(registry.markdown(), to: config.tags)
+    }
+
+    /// Tasks (open or done) carrying a tag anywhere on their line.
+    public func tasks(tagged name: String) -> [TaskItem] {
+        let n = TagRegistry.normalize(name)
+        return tasks.filter { $0.tags.contains { $0.lowercased() == n } }
+    }
+
+    /// Renames a tag in the list and on every task line that uses it.
+    public func renameTag(_ old: String, to new: String) throws {
+        try updateTags { try $0.rename(old, to: new) }
+        let o = TagRegistry.normalize(old), n = TagRegistry.normalize(new)
+        guard o != n else { return }
+        for t in tasks(tagged: o) { if let id = t.taskID { try store.renameTag(id, from: o, to: n, actor: .you) } }
+        resync()
+        syncTags()
+        writeNow()
+    }
+
+    /// Removes a tag from the list. Only for tags no task uses; otherwise it would come straight back.
+    public func removeTag(_ name: String) throws {
+        let users = tasks(tagged: name).count
+        guard users == 0 else { throw TagError.inUse(users) }
+        try updateTags { $0.remove(name) }
     }
 
     /// Re-reads tasks after the app itself changed them, without logging them as outside edits.

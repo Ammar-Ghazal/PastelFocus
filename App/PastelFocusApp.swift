@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderSnapshots(to dir: URL) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         func save<V: View>(_ name: String, _ view: V) {
-            let r = ImageRenderer(content: view.environmentObject(model).environmentObject(model.ticks).environment(\.snapshotMode, true).padding(20).background(Color(hex: 0x6B5A7A)))
+            let r = ImageRenderer(content: view.environmentObject(model).environmentObject(model.ticks).environment(\.plantArt, model.plantArt).environment(\.snapshotMode, true).padding(20).background(Color(hex: 0x6B5A7A)))
             r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation,
                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
@@ -68,6 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]
         save("stop-reason", StopReasonCard(settings: demo, done: { _ in }, cancel: {}).frame(width: 280).environment(\.theme, t))
         save("appearance", AppearanceView(settings: settings).frame(width: 760, height: 640).environment(\.theme, t))
+        save("tags", TagsView().frame(width: 760, height: 420).environment(\.theme, t))
+        save("slots", HStack(spacing: 14) {
+            ForEach(Slot.allCases, id: \.self) { slot in
+                VStack(spacing: 6) {
+                    SpriteView(rows: PlantDesigns.sprite(slot, theme: t.definition.id), px: 6)
+                    Text("\(slot.letter) · \(PlantDesigns.name(slot, theme: t.definition.id))").font(.system(size: 10)).foregroundStyle(t.textSecondary)
+                }
+            }
+        }.padding(16).background(t.surface).environment(\.theme, t))
         // Garden plots from 2 to 120 sessions, to check how the plot grows and zooms out.
         let cal = model.coordinator.calendar, today = model.coordinator.today
         let cats = ["coding", "learning", "health", "personal", nil]
@@ -117,5 +126,6 @@ struct Themed<Content: View>: View {
         content()
             .environment(\.theme, model.theme)
             .environment(\.ambientMotion, model.settings.ambientMotion)
+            .environment(\.plantArt, model.plantArt)
     }
 }

@@ -69,6 +69,7 @@ struct SettingsView: View {
         TabView {
             general.tabItem { Label("General", systemImage: "gearshape") }
             AppearanceView(settings: settings).tabItem { Label("Appearance", systemImage: "paintpalette") }
+            TagsView().tabItem { Label("Tags", systemImage: "tag") }
         }
         .frame(width: 780, height: 660)
     }

@@ -54,6 +54,7 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 | `PastelFocus/Stats/YYYY-Www.md`, `YYYY-MM.md` | app (nightly) | Weekly / monthly summaries |
 | `PastelFocus/Logs/{sessions,events,suggestions}-YYYY-MM.jsonl` | app | Append-only raw history (or private, see Settings) |
 | `PastelFocus/Problems.md` | app | Lines it couldn't read (never deletes them) |
+| `PastelFocus/Tags.md` | app, you | Tags and the plant slot (A–J) each grows; new tags on task lines are added automatically |
 | `PastelFocus/Garden/YYYY-MM.png` (or `YYYY-Www`, `YYYY-MM-DD`) | app | Garden postcard: each month automatically, any view on request |
 
 ### Task line (Obsidian Tasks plugin format)
@@ -112,7 +113,9 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Night Garden
 
-Each finished focus session plants a pixel sprite (species by category, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week. A good day is total focused time across all focus sessions (finished or stopped) reaching a threshold you set in Settings, 3 h by default; breaks and NSDR neither count nor spoil it. Stats files show the same count.
+Each finished focus session plants a pixel sprite (design from its task's first tag, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week. A good day is total focused time across all focus sessions (finished or stopped) reaching a threshold you set in Settings, 3 h by default; breaks and NSDR neither count nor spoil it. Stats files show the same count.
+
+**Tags and plants.** The first tag on a task line (skipping `#later`, which marks priority) is the task's category and decides its plant, both in the garden and as the icon on its Today row. Each tag picks one of ten slots (A–J) in `PastelFocus/Tags.md`; every theme draws its own design for each slot (`App/Theme/PlantArt.swift`, currently one shared set), and a tag can optionally pick a different slot in one theme. New tags, from you or Hermes, are added on the least-used slot; several tags may share a slot. Renaming a tag in Settings → Tags rewrites it on every task line; only unused tags can be removed.
 
 Like Forest, the garden is an isometric block of land with **Day / Week / Month** views (arrows step back through earlier periods). The plot starts at 4×4 tiles and grows so it's never more than ~45% full; tiles shrink as it grows, so the view zooms out instead of getting cluttered. Each session has a fixed home (a fraction of the plot from an FNV-1a seed of its id) and takes the free tile nearest it, earliest sessions first, so plants stay within about a tile of their relative spot as the plot grows. The save button writes the period you're viewing to `PastelFocus/Garden/` (`2026-10.png`, `2026-W41.png` or `2026-10-07.png`); last month's is saved automatically. Fireflies (one per finished task) and the waterfall are Core Animation layers.
 
@@ -148,11 +151,12 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `LogCacheTests` | Cache hits, appends and outside edits invalidate |
 | `ThemeTests` | 12 themes × 21 palettes: contrast, gamut, unique IDs, distinguishable tags, light/dark matching |
 | `CoordinatorTests` | End-to-end: refresh, no-op write guard, outside edits, Hermes Inbox, timer + restart, nightly files, index rebuild |
+| `TagsTests` | First-tag rule, least-used slots, theme overrides, Tags.md round trip and hand edits, rename across task lines (whole tags only), remove only unused, plants carry their tag |
 | `CareerCoachContractTests` | Link career-coach boundary: Inbox create/reschedule round-trip without duplicates, wiki/report checklists never become tasks; replays a real coach run (on a temp copy) when `PASTELFOCUS_COACH_FIXTURE` is set |
 
 ## Settings (menu bar → Settings…)
 
-Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · good-day threshold (3 h) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · open at login. Appearance tab: theme, colour combo, ambient motion, match macOS light/dark.
+Vault and daily-notes folder · raw logs in vault (on) or private · let Hermes start sessions (off) · focus length (also on the dial) · good-day threshold (3 h) · NSDR audio · float panels above windows (off = desktop level) · panel visibility · open at login. Appearance tab: theme, colour combo, ambient motion, match macOS light/dark. Tags tab: add, rename and remove tags, and pick each tag's plant (for all themes or just the current one).
 
 ## Code map
 

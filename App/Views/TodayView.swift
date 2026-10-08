@@ -161,6 +161,7 @@ struct TodayView: View {
 struct TaskRow: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
+    @Environment(\.plantArt) var plantArt
     @Environment(\.snapshotMode) var snapshot
     let task: TaskItem
     let highlighted: Bool
@@ -171,7 +172,7 @@ struct TaskRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Checkbox(checked: done) { model.toggle(task) }.padding(-6) // bigger target, same layout
-            SpriteView(rows: Sprite.forCategory(task.category), px: 2).opacity(done ? 0.5 : 1)
+            SpriteView(rows: plantArt.sprite(forTag: task.category), px: 2).opacity(done ? 0.5 : 1) // the plant its first tag grows
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title).font(.system(size: 15, weight: .semibold))
                     .strikethrough(done, color: theme.textTertiary)
