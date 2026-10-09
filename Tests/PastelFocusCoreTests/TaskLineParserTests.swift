@@ -34,6 +34,34 @@ final class TaskLineParserTests: XCTestCase {
         XCTAssertEqual([25, 60, 85].map(TaskLineParser.formatMinutes), ["25m", "1h", "1h 25m"])
     }
 
+    func testLeadingTimeAndRange() throws {
+        let a = try XCTUnwrap(TaskLineParser.parse("- [ ] 07:00 Job pipeline: scan leads #career ⏫ ⏳ 2026-10-09 🆔 zzwi"))
+        XCTAssertEqual(a.startTime, "07:00")
+        XCTAssertNil(a.durationMinutes)
+        XCTAssertEqual(a.title, "Job pipeline: scan leads")
+        XCTAssertEqual(TaskLineParser.serialize(a), "- [ ] 07:00 Job pipeline: scan leads #career ⏫ ⏳ 2026-10-09 🆔 zzwi")
+
+        let b = try XCTUnwrap(TaskLineParser.parse("- [ ] 07:45–09:15 Apply to roles #career 🆔 qfsj"))
+        XCTAssertEqual(b.startTime, "07:45")
+        XCTAssertEqual(b.durationMinutes, 90)
+        XCTAssertEqual(b.endTime, "09:15")
+        XCTAssertEqual(b.timeLabel, "07:45–09:15")
+        XCTAssertEqual(TaskLineParser.serialize(b), "- [ ] 07:45 - 09:15 Apply to roles #career 🆔 qfsj") // canonical spacing
+
+        let late = try XCTUnwrap(TaskLineParser.parse("- [ ] 23:30 - 00:15 Night review"))
+        XCTAssertEqual(late.durationMinutes, 45)
+
+        let d = try XCTUnwrap(TaskLineParser.parse("- [ ] Read a paper [duration:: 45m] 🆔 rp01"))
+        XCTAssertNil(d.startTime)
+        XCTAssertEqual(d.durationMinutes, 45)
+        XCTAssertEqual(d.timeLabel, "45 min")
+        XCTAssertEqual(TaskLineParser.serialize(d), "- [ ] Read a paper [duration:: 45m] 🆔 rp01")
+
+        // Not a time: left as text.
+        XCTAssertNil(TaskLineParser.parse("- [ ] 25:00 isn't a time")?.startTime)
+        XCTAssertNil(TaskLineParser.parse("- [ ] Call at 10:00")?.startTime)
+    }
+
     func testProgressRoundTrips() throws {
         let line = "- [/] Draft report #writing [spent:: 50m] [progress:: 60] 🆔 dr01"
         let t = try XCTUnwrap(TaskLineParser.parse(line))

@@ -83,6 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         saveWindow("task-picker", size: CGSize(width: 300, height: 200), TaskPickerList {}.padding(10).frame(maxHeight: .infinity, alignment: .top))
         save("today-min-height", TodayView().frame(height: TodayView.heightRange.lowerBound).environment(\.theme, t))
         save("dial-idle", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))
+        save("dial-clock", HStack(spacing: 24) { TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }, style: .clock); TimerDial(minutes: 25, progress: 0.62, clock: "15:30", caption: "left", onCommit: { _ in }, style: .clock) }.padding(10).environment(\.theme, t))
+        save("dial-hourglass", HStack(spacing: 24) { TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }, style: .hourglass); TimerDial(minutes: 25, progress: 0.62, clock: "15:30", caption: "left", onCommit: { _ in }, style: .hourglass) }.padding(10).environment(\.theme, t))
+        save("dial-water", HStack(spacing: 24) { TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }, style: .water); TimerDial(minutes: 25, progress: 0.62, clock: "15:30", caption: "left", onCommit: { _ in }, style: .water) }.padding(10).environment(\.theme, t))
         save("dial-stopwatch", TimerDial(minutes: 25, progress: 0.3, clock: "18:05", caption: "elapsed", onCommit: { _ in }, editable: false).padding(10).environment(\.theme, t))
         let demo = AppSettings()
         demo.savedReasons = [StopReasons.shorten("Phone call from family"), StopReasons.shorten("Had to pick up my brother from school")]

@@ -87,8 +87,13 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     public var due: String?
     public var start: String?
     public var completed: String?
-    /// Obsidian Tasks recurrence rule (`🔁 every day`), without the emoji.
+    /// Obsidian Tasks recurrence rule (`🔁 every day`), without the emoji. See `Recurrence`.
     public var recurrence: String?
+    /// Time of day it's planned for, "HH:MM" (24-hour), from a leading `07:00` or `07:00 - 07:45`.
+    public var startTime: String?
+    /// Planned length in minutes: the span of a `07:00 - 07:45` range, or `[duration:: 45m]` when
+    /// there's no start time.
+    public var durationMinutes: Int?
     public var notes: [String]
 
     /// Vault-relative path of the file holding the line.
@@ -102,7 +107,8 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
                 priority: Priority = .none, priorityFromLegacy: Bool = false,
                 spentMinutes: Int? = nil, progress: Int? = nil, legacyEstimate: Int? = nil, legacySessions: Int? = nil,
                 created: String? = nil, scheduled: String? = nil, due: String? = nil,
-                start: String? = nil, completed: String? = nil, recurrence: String? = nil, notes: [String] = [],
+                start: String? = nil, completed: String? = nil, recurrence: String? = nil,
+                startTime: String? = nil, durationMinutes: Int? = nil, notes: [String] = [],
                 file: String = "", lineIndex: Int = 0, indent: String = "") {
         self.taskID = taskID
         self.status = status
@@ -119,6 +125,8 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
         self.start = start
         self.completed = completed
         self.recurrence = recurrence
+        self.startTime = startTime
+        self.durationMinutes = durationMinutes
         self.notes = notes
         self.file = file
         self.lineIndex = lineIndex
@@ -136,6 +144,21 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     }
 
     public var isLater: Bool { tags.contains { $0.lowercased() == "later" } }
+
+    /// The repeat rule, when the app can read it (a task can repeat with a rule it can't).
+    public var rule: Recurrence? { recurrence.flatMap(Recurrence.init) }
+
+    /// "HH:MM" the planned time ends, when both start and length are known.
+    public var endTime: String? {
+        guard let s = startTime, let d = durationMinutes, let m = TaskTime.minutes(s) else { return nil }
+        return TaskTime.string((m + d) % (24 * 60))
+    }
+
+    /// "07:00–07:45", "07:00", "45 min" or nil.
+    public var timeLabel: String? {
+        if let s = startTime { return endTime.map { "\(s)–\($0)" } ?? s }
+        return durationMinutes.map { GoodDay.label($0) }
+    }
 
     /// Still carries `[est:: N]` or `[sessions:: N]`.
     public var hasLegacyTimeFields: Bool { legacyEstimate != nil || legacySessions != nil }

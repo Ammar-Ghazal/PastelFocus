@@ -115,7 +115,7 @@ public enum Reports {
                   "## Open tasks", ""]
         let open = today.filter { $0.status.isOpen }
         lines += open.isEmpty ? ["- none"] : open.map { t in
-            var bits = ["- \(t.title)", "🆔 \(t.taskID ?? "?")"]
+            var bits = ["- \(t.timeLabel.map { "\($0) " } ?? "")\(t.title)", "🆔 \(t.taskID ?? "?")"]
             if t.priority != .none { bits.append(t.priority.label.lowercased()) }
             if let m = t.spentMinutes, m > 0 { bits.append("\(GoodDay.label(m)) spent") }
             return bits.joined(separator: " · ")

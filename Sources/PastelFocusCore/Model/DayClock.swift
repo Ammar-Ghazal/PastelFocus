@@ -48,6 +48,17 @@ public struct DayCalendar: Sendable {
         return self.day(r)
     }
 
+    public func addMonths(_ n: Int, to day: String) -> String {
+        guard let d = startOfDay(day), let r = calendar.date(byAdding: .month, value: n, to: d) else { return day }
+        return self.day(r)
+    }
+
+    /// Whole days from `a` to `b` (negative when `b` is earlier).
+    public func daysBetween(_ a: String, _ b: String) -> Int {
+        guard let x = startOfDay(a), let y = startOfDay(b) else { return 0 }
+        return calendar.dateComponents([.day], from: x, to: y).day ?? 0
+    }
+
     public func hour(_ date: Date) -> Int { calendar.component(.hour, from: date) }
     public func minuteOfDay(_ date: Date) -> Int { hour(date) * 60 + calendar.component(.minute, from: date) }
 

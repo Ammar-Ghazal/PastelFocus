@@ -91,7 +91,7 @@ public enum SafeFile {
         return true
     }
 
-    struct Signature: Equatable { let size: Int; let mtime: Date? ; let exists: Bool }
+    public struct Signature: Equatable, Sendable { public let size: Int; public let mtime: Date?; public let exists: Bool }
 
     static func signature(_ url: URL) -> Signature {
         guard let a = try? FileManager.default.attributesOfItem(atPath: url.path) else {

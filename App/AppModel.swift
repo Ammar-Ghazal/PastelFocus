@@ -87,7 +87,11 @@ final class AppModel: ObservableObject {
     let notifier = Notifier()
     private let editors = TaskEditorWindows()
     private var sleepStart: Date?
-    private var refreshPending = false
+    /// Vault changes waiting to settle, and when the first of them arrived.
+    private var settleWork: DispatchWorkItem?
+    private var firstChangeAt: Date?
+    /// How long vault changes take to show up (Settings → General).
+    @Published private(set) var syncLatency = SyncLatency()
     private var bag: Set<AnyCancellable> = []
     private var lastNightlyDay: String? { get { UserDefaults.standard.string(forKey: "lastNightly") } set { UserDefaults.standard.set(newValue, forKey: "lastNightly") } }
 
@@ -163,7 +167,9 @@ final class AppModel: ObservableObject {
     private func start() {
         let c = coordinator.config
         for dir in [c.dailyDir, c.appDir] { try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
-        watcher = FileWatcher(paths: [c.dailyDir.path, c.appDir.path]) { [weak self] in self?.scheduleRefresh() }
+        watcher = FileWatcher(paths: [c.dailyDir.path, c.appDir.path]) { [weak self] paths in
+            MainActor.assumeIsolated { self?.vaultChanged(paths) }
+        }
         refreshNow()
         if lastNightlyDay != coordinator.today { runNightly() }
         startTicker()
@@ -176,13 +182,33 @@ final class AppModel: ObservableObject {
 
     // MARK: Refresh
 
-    private func scheduleRefresh() {
-        guard !refreshPending else { return }
-        refreshPending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.refreshPending = false
-            self?.refreshNow()
-        }
+    /// Quiet time after the last change before reading: an editor may save a file in several
+    /// writes, and reading between them would see half a file. Never longer than `maxSettle` after
+    /// the first change, so a file that keeps changing still shows up.
+    static let settle: TimeInterval = 0.12
+    static let maxSettle: TimeInterval = 0.6
+
+    /// From the file watcher. Only task files count; the rest of the vault and the app's own logs
+    /// and reports are ignored.
+    private func vaultChanged(_ paths: [String]) {
+        let config = coordinator.config
+        guard paths.contains(where: config.isTaskSource) else { return }
+        let first = firstChangeAt ?? Date()
+        firstChangeAt = first
+        settleWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.applyVaultChange() }
+        settleWork = work
+        let delay = Date().timeIntervalSince(first) >= Self.maxSettle ? 0 : Self.settle
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func applyVaultChange() {
+        settleWork = nil
+        firstChangeAt = nil
+        // Unchanged since the app last read or wrote the files: our own write coming back.
+        guard let change = coordinator.externalChange() else { return }
+        refreshNow()
+        if let t = change.newest { syncLatency.record(Date().timeIntervalSince(t)) }
     }
 
     func refreshNow() {

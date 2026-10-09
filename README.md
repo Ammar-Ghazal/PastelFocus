@@ -59,14 +59,18 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 
 ### Task line (Obsidian Tasks plugin format)
 
+The full shared format, for the app and for agents writing to the vault, is [docs/TASK_FORMAT.md](docs/TASK_FORMAT.md). In short:
+
 ```
-- [ ] Finalize resume — one ready-to-send version #career [spent:: 1h 25m] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
+- [ ] 09:00 - 10:30 Finalize resume — one ready-to-send version #career [spent:: 1h 25m] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
     - notes as indented sub-bullets
 ```
 
 Priority: 🔺 urgent, ⏫ high, 🔼 medium, 🔽 low (⏬ is read as low); no emoji means no priority. The Today list is sorted by priority by default (urgent, high, medium, none, low, as in the Tasks plugin); Settings → General → Today list can sort by task name or tag instead. Unfinished tasks always come first, then `#later` tasks, then finished ones.
 
 Below today's tasks, the list shows upcoming one-time tasks: open tasks planned for a later day (by ⏳, or by the daily note they sit in), under a heading per day ("Tomorrow", "Friday", …). A task with a Tasks-plugin recurrence (`🔁 every day`, `🔁 every week on Monday`) is a routine: it shows only on its current day, so future copies of it never fill the list. Undated Backlog tasks stay off the list, and Daily Progress counts only today's tasks.
+
+**Times.** A line may start with a time of day, `07:00`, or a range, `07:00 - 07:45` (24-hour), as Hermes already writes timed tasks and the Day Planner plugin reads them. It's shown on the Today row and in Now.md. A length without a time is `[duration:: 45m]`. Repeat rules (`🔁 every weekday`, `every 2 weeks on Friday`, …) are read into dates the app can work with.
 
 **Time spent.** `[spent:: 1h 25m]` is the focus time logged on the task, kept in step with the sessions log after every focus session (finished, stopped or switched). The app owns it; it is shown on Today rows, in the editor and in Now.md. Estimates and session counts are gone: on refresh, any line still carrying `[est:: N]` or `[sessions:: N]` is rewritten with `[spent:: …]` (the time the sessions log holds for the task, or N × 25 min for an old count the log doesn't know), and each changed file is first copied to `~/Library/Application Support/PastelFocus/Backups/`. An `[est:: N]` in a create command is dropped.
 
@@ -85,6 +89,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 ## Focus panel
 
 - **Timer dial:** drag the ring (or use the arrow keys) to set 5–120 min in 5-min steps; rest scales with it (about a fifth, 3–20 min; long rest ×3). While running, the ring shows time left.
+- **Timer style (⋯ menu):** Ring (the default dial), Clock (a kitchen-timer wedge), Hourglass (sand runs from the top bulb while the timer runs) or Water drip (a tank drains drop by drop). Every style shows the same value: time left, or while idle, the chosen length. Set the length by dragging around the ring or clock, or up and down the hourglass or tank, or with the arrow keys. The flowing sand and drops only animate while running, with ambient motion on and Reduce Motion off. The ⋯ menu holds only panel options (timer style and breaks); choosing the task is the dropdown, and editing tasks happens in Today.
 - **Stopwatch mode:** the toggle in the header switches to counting up. Stopping a stopwatch finishes it (logged as completed, `preset: "stopwatch"`, planned = actual); a forgotten one stops itself after 4 h.
 - **Choosing the task:** click the task name next to the dial to open a dropdown of today's open tasks (or *No task*). While idle it picks the next task; during a session it moves the session to the one you pick (see below). Esc or a click outside closes it.
 - **Both panels agree:** the task in focus is highlighted in Today with a *Focusing* (or *Paused*) chip, and its play button becomes pause/resume. Starting another task's play button, or picking a task in the Focus dropdown, during a session moves the session to that task: the time so far is logged for the old task as `switched` (not an interruption, no wilted plant) and the timer carries on (a countdown keeps its time left; a stopwatch counts from zero). Ticking the task in focus done in Today ends its session. Rows can't start focus during a rest.
@@ -116,6 +121,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Performance notes
 
+- **Live updates from the vault:** an FSEvents watcher on the daily folder and the PastelFocus folder. Only task files count (immediate `.md` files of the daily folder, Backlog, Inbox, Tags.md); wiki pages, the app's logs and reports, and hidden temp files are ignored. After the last change it waits 0.12 s for the write to settle (never more than 0.6 s after the first), then compares sizes and modification times with what the app last read or wrote: a match is the app's own write echoing back and is skipped, so the app and Hermes can't wake each other in a loop. Concurrent writes are handled by `SafeFile` (re-read, compare, atomic rename, retry). Target: a change shows within 1 s (95%); measured here, events arrive in ~5 ms and a refresh of 50 tasks takes ~15 ms, so ~0.15 s end to end. Settings → General → Vault shows the measured latency.
 - Per-second timer values live in `TickState`, observed only by the Focus panel and menu-bar label, so the Today list doesn't redraw every second.
 - Looping animations (garden fireflies, play-button glow) are Core Animation layers that run in the render server; the dial ring eases only when you change it, not on every tick.
 - Log files are cached per file and re-parsed only when their size or date changes; generated files are written only when their content changes.

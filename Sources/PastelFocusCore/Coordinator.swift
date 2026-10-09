@@ -44,6 +44,13 @@ public final class Coordinator {
         insights = loadInsightsCache()
     }
 
+    /// The task files as the app last read or wrote them. A change that matches this is the app's
+    /// own write coming back from the file watcher.
+    public private(set) var lastSnapshot = VaultSnapshot()
+
+    /// Task files that changed since the app last read or wrote them; nil when none did.
+    public func externalChange() -> VaultChange? { store.snapshot().changes(since: lastSnapshot) }
+
     public var today: String { calendar.day(clock.now()) }
     public var todayTasks: [TaskItem] { store.todayTasks(tasks) }
     public var upcomingTasks: [TaskItem] { store.upcomingTasks(tasks) }
@@ -72,6 +79,7 @@ public final class Coordinator {
         if (try? inbox.process()) ?? 0 > 0 { resync() }
         syncTags()
         writeNow()
+        lastSnapshot = store.snapshot()
         return external
     }
 
@@ -132,6 +140,7 @@ public final class Coordinator {
         let r = store.scan()
         tasks = r.tasks
         problems = r.problems
+        lastSnapshot = store.snapshot()
     }
 
     /// Runs an app-initiated change, then resyncs and updates the generated files (and the tag list).
@@ -140,6 +149,7 @@ public final class Coordinator {
         resync()
         syncTags() // a new tag typed in the editor joins the list straight away
         writeNow()
+        lastSnapshot = store.snapshot()
     }
 
     // MARK: Timer

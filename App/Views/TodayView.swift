@@ -198,6 +198,7 @@ struct TaskRow: View {
                     .foregroundStyle(done ? theme.textTertiary : theme.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 6) {
+                    if let t = task.timeLabel { Text(t).monospacedDigit().foregroundStyle(theme.textPrimary.opacity(0.8)) }
                     if task.isRepeating { Image(systemName: "repeat").help("Repeats \(task.recurrence ?? "")") }
                     if let s = task.subtitle { Text(s).lineLimit(1) }
                     if let m = task.spentMinutes, m > 0 { Text("· \(GoodDay.label(m))").help("Time spent") }

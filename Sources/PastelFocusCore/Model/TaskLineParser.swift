@@ -9,7 +9,7 @@ public enum TaskLineParser {
     static let priorityField = try! NSRegularExpression(pattern: #"\s*(🔺|⏫|🔼|🔽|⏬)️?"#)
     /// The rule runs to the next field or tag, as the Tasks plugin reads it: `🔁 every week on Monday`.
     static let recurrenceField = try! NSRegularExpression(pattern: #"\s*🔁\s*([A-Za-z0-9,! ]*[A-Za-z0-9!])"#)
-    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions|spent|progress)::\s*([^\]]*?)\s*\]"#)
+    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions|spent|progress|duration)::\s*([^\]]*?)\s*\]"#)
     static let legacyMarker = try! NSRegularExpression(pattern: #"\*\*P([123])\s*·\s*([0-9.]+)(?:\s*[–-]\s*([0-9.]+))?\s*(min|h)\*\*\s*"#)
     static let tagPattern = try! NSRegularExpression(pattern: #"(?<![\w#])#([A-Za-z][\w/-]*)"#)
 
@@ -58,6 +58,7 @@ public enum TaskLineParser {
             case "est": item.legacyEstimate = Int(match[2])
             case "sessions": item.legacySessions = Int(match[2])
             case "progress": item.progress = Int(match[2].replacingOccurrences(of: "%", with: "")).map { min(100, max(0, $0)) }
+            case "duration": item.durationMinutes = parseMinutes(match[2])
             default: item.spentMinutes = parseMinutes(match[2])
             }
         }
@@ -74,17 +75,24 @@ public enum TaskLineParser {
             }
         }
 
-        item.description = collapseSpaces(text)
+        text = collapseSpaces(text)
+        if let (start, length, rest) = TaskTime.leading(text) {
+            item.startTime = start
+            if let length { item.durationMinutes = length }
+            text = rest
+        }
+        item.description = text
         return item
     }
 
     /// Canonical line: description, inline fields, then Tasks plugin emoji fields (which must come last).
     public static func serialize(_ t: TaskItem) -> String {
-        var parts: [String] = [t.description]
+        var parts: [String] = [TaskTime.prefix(t) + t.description]
         // An old session count that hasn't been migrated yet is kept as time rather than dropped.
         let spent = t.spentMinutes ?? t.legacySessions.map { $0 * minutesPerSession }
         if let m = spent, m > 0 { parts.append("[spent:: \(formatMinutes(m))]") }
         if let p = t.progress { parts.append("[progress:: \(p)]") }
+        if t.startTime == nil, let d = t.durationMinutes, d > 0 { parts.append("[duration:: \(formatMinutes(d))]") }
         if !t.priorityFromLegacy, let p = t.priority.emoji { parts.append(p) }
         if let r = t.recurrence { parts.append("🔁 \(r)") }
         if let d = t.created { parts.append("➕ \(d)") }
