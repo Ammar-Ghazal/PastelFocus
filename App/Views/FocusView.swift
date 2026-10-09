@@ -23,7 +23,9 @@ struct FocusView: View {
             }
             HStack(alignment: .center, spacing: 18) {
                 TimerDial(minutes: model.settings.focusMinutes, progress: dialProgress, clock: clock,
-                          caption: dialCaption, onCommit: { model.setFocusMinutes($0) }, editable: !stopwatch)
+                          caption: dialCaption, onCommit: { model.setFocusMinutes($0) }, editable: !stopwatch,
+                          style: model.settings.timerStyle,
+                          flowing: model.phase == .running && !reduceMotion && model.settings.ambientMotion && !snapshot)
                 VStack(alignment: .leading, spacing: 10) {
                     TaskPickerButton(title: label, open: picking, enabled: canPick) { if !snapshot { setPicking(!picking) } }
                     HStack(spacing: 10) {
@@ -158,8 +160,17 @@ struct FocusView: View {
         .onChange(of: model.phase, initial: true) { _, p in breathe = p == .running && !reduceMotion }
     }
 
+    /// The panel's own options: how time looks, and breaks. Task choice lives in the task dropdown
+    /// and task editing in Today, so nothing here changes a task.
     private var menu: some View {
         Menu {
+            Section("Timer style") {
+                Picker("Timer style", selection: Binding(get: { model.settings.timerStyle },
+                                                         set: { model.settings.timerStyle = $0; model.objectWillChange.send() })) {
+                    ForEach(TimerStyle.allCases) { s in Label(s.label, systemImage: s.symbol).tag(s) }
+                }
+                .pickerStyle(.inline).labelsHidden()
+            }
             Section("Breaks") {
                 Button("Short rest") { model.startRest(kind: .shortBreak) }
                 Button("Long rest") { model.startRest(kind: .longBreak) }
@@ -167,6 +178,7 @@ struct FocusView: View {
             }.disabled(model.phase != .idle)
         } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 24)
+        .help("Timer style and breaks")
     }
 
     @ViewBuilder private var cards: some View {

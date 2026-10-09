@@ -43,6 +43,8 @@ final class AppSettings: ObservableObject {
     @Published var savedReasons: [String] { didSet { d.set(savedReasons, forKey: "savedReasons") } }
     /// Focused minutes in a day that make it a good day (Night Garden streak and landmarks).
     @Published var goodDayMinutes: Int { didSet { d.set(goodDayMinutes, forKey: "goodDayMinutes") } }
+    /// How the Focus panel draws time (ring, clock, hourglass, water drip).
+    @Published var timerStyle: TimerStyle { didSet { d.set(timerStyle.rawValue, forKey: "timerStyle") } }
     /// Order of the Today list.
     @Published var taskSort: TaskSort { didSet { d.set(taskSort.rawValue, forKey: "taskSort") } }
 
@@ -88,6 +90,7 @@ final class AppSettings: ObservableObject {
         savedReasons = d.stringArray(forKey: "savedReasons") ?? []
         stopwatchMode = d.bool(forKey: "stopwatchMode")
         taskSort = d.string(forKey: "taskSort").flatMap(TaskSort.init(rawValue:)) ?? .priority
+        timerStyle = d.string(forKey: "timerStyle").flatMap(TimerStyle.init(rawValue:)) ?? .ring
     }
 
     var preset: FocusPreset { .forFocus(focusMinutes) }
