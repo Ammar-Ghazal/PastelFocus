@@ -2,11 +2,11 @@ import XCTest
 @testable import PastelFocusCore
 
 final class ThemeTests: XCTestCase {
-    func testCatalogueSize() {
-        XCTAssertGreaterThanOrEqual(ThemeCatalog.all.count, 10)
+    func testSixThemesEachWithDarkAndLight() {
+        XCTAssertEqual(ThemeCatalog.all.map(\.id), ["space", "cherry-blossom", "rainforest", "snow", "ember", "cyberpunk"])
         for t in ThemeCatalog.all {
-            XCTAssertGreaterThanOrEqual(t.palettes.count, 20, t.name)
-            XCTAssertTrue(t.palettes.contains { $0.isDark } || t.palettes.contains { !$0.isDark }, t.name)
+            XCTAssertGreaterThanOrEqual(t.palettes.count, 6, t.name)
+            XCTAssertTrue(t.palettes.contains { $0.isDark } && t.palettes.contains { !$0.isDark }, t.name)
         }
         XCTAssertEqual(Set(ThemeCatalog.all.map(\.scene)).count, ThemeCatalog.all.count, "each theme has its own scene")
     }
@@ -19,7 +19,19 @@ final class ThemeTests: XCTestCase {
             XCTAssertTrue(t.palettes.allSatisfy { $0.id.hasPrefix(t.id + "/") })
         }
         XCTAssertEqual(PaletteBuilder.slug("Will-o'-Wisp"), "will-o-wisp")
-        XCTAssertNotNil(ThemeCatalog.theme("deep-space")?.palette("deep-space/saturn-gold"))
+        XCTAssertNotNil(ThemeCatalog.theme("space")?.palette("space/saturn-gold"))
+    }
+
+    func testOldSelectionsCarryOver() {
+        let kept = ThemeCatalog.migrate(ThemeSelection(themeID: "deep-space", paletteID: "deep-space/supernova"))
+        XCTAssertEqual(kept, ThemeSelection(themeID: "space", paletteID: "space/supernova"))
+        let original = ThemeCatalog.migrate(ThemeSelection(themeID: "pastel-retro", paletteID: "pastel-retro/midnight-blossom"))
+        XCTAssertEqual(original.paletteID, "cherry-blossom/midnight-blossom")
+        let other = ThemeCatalog.migrate(ThemeSelection(themeID: "terminal", paletteID: "terminal/amber-crt"))
+        XCTAssertEqual(other, ThemeSelection(themeID: "cyberpunk", paletteID: "cyberpunk/neon-rain"))
+        XCTAssertEqual(ThemeCatalog.resolve(ThemeSelection(themeID: "winter", paletteID: "winter/snowfall")).0.id, "snow")
+        let current = ThemeSelection(themeID: "ember", paletteID: "ember/hearth")
+        XCTAssertEqual(ThemeCatalog.migrate(current), current)
     }
 
     /// Readability rules every palette must meet, generated or hand-made.
@@ -64,10 +76,10 @@ final class ThemeTests: XCTestCase {
     }
 
     func testResolveFallsBack() {
-        let (t, p) = ThemeCatalog.resolve(ThemeSelection(themeID: "aurora", paletteID: "missing"))
-        XCTAssertEqual(t.id, "aurora")
+        let (t, p) = ThemeCatalog.resolve(ThemeSelection(themeID: "snow", paletteID: "missing"))
+        XCTAssertEqual(t.id, "snow")
         XCTAssertEqual(p.id, t.defaultPalette.id)
-        XCTAssertEqual(ThemeCatalog.resolve(ThemeSelection(themeID: "nope", paletteID: "x")).0.id, "pastel-retro")
+        XCTAssertEqual(ThemeCatalog.resolve(ThemeSelection(themeID: "nope", paletteID: "x")).0.id, "cherry-blossom")
     }
 
     func testMatchSystemPicksClosestCounterpart() {
