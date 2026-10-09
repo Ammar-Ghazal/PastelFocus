@@ -84,6 +84,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 - **Timer dial:** drag the ring (or use the arrow keys) to set 5–120 min in 5-min steps; rest scales with it (about a fifth, 3–20 min; long rest ×3). While running, the ring shows time left.
 - **Stopwatch mode:** the toggle in the header switches to counting up. Stopping a stopwatch finishes it (logged as completed, `preset: "stopwatch"`, planned = actual); a forgotten one stops itself after 4 h.
+- **Both panels agree:** the task in focus is highlighted in Today with a *Focusing* (or *Paused*) chip, and its play button becomes pause/resume. Starting another task's play button, or picking a task in the Focus menu, during a session moves the session to that task: the time so far is logged for the old task as `switched` (not an interruption, no wilted plant) and the timer carries on (a countdown keeps its time left; a stopwatch counts from zero). Ticking the task in focus done in Today ends its session. Rows can't start focus during a rest.
 - **Stop early:** quick reasons (`interrupted`, `blocked`, `done early`), your saved reasons, or type your own and tick *Save as a quick reason*. Saved reasons are shortened to 22 characters at a word boundary; right-click one to remove it. The daily note shows the short label; the sessions log keeps your full text.
 
 ## Themes

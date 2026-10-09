@@ -123,7 +123,23 @@ public final class FocusEngine {
     /// Starts a countdown of `minutes` (default: the preset), or a stopwatch that counts up.
     public func start(task: TaskRef?, minutes: Int? = nil, stopwatch: Bool = false) throws {
         guard phase == .idle else { throw EngineError.busy }
-        let planned = stopwatch ? stopwatchCapS : (minutes ?? preset.focusMinutes) * 60
+        begin(task: task, plannedS: stopwatch ? stopwatchCapS : (minutes ?? preset.focusMinutes) * 60, stopwatch: stopwatch)
+    }
+
+    /// Moves a running or paused focus session to another task. The time so far is recorded for
+    /// the old task (outcome `.switched`) and a new session carries on in the same state: a
+    /// countdown keeps its remaining time, a stopwatch counts again from zero.
+    public func switchTask(to task: TaskRef?) throws -> SessionRecord {
+        guard phase == .running || phase == .paused, let a = active, a.kind == .focus else { throw EngineError.notRunning }
+        let wasPaused = phase == .paused
+        let left = remainingS
+        let record = finish(at: clock.now(), outcome: .switched, reason: nil)
+        begin(task: task, plannedS: a.isStopwatch ? stopwatchCapS : max(1, left), stopwatch: a.isStopwatch)
+        if wasPaused { try pause() }
+        return record
+    }
+
+    private func begin(task: TaskRef?, plannedS planned: Int, stopwatch: Bool) {
         let now = clock.now()
         active = ActiveSession(id: Self.newSessionID(), kind: .focus, task: task, plannedS: planned,
                                startedAt: now, bankedS: 0, runningSince: now, pausedAt: nil, pauses: [],
@@ -214,10 +230,11 @@ public final class FocusEngine {
             a.pauses.append(PauseRecord(atS: a.bankedS, durS: Int(end.timeIntervalSince(pausedAt))))
         }
         let focused = outcome == .completed && !a.isStopwatch ? a.plannedS : a.bankedS
-        // A stopwatch has no plan: record planned = actual so analytics never read it as cut short.
+        // A stopwatch has no plan, and a switched session's plan moved on to the next one: record
+        // planned = actual so analytics never read them as cut short.
         let record = SessionRecord(id: a.id, kind: a.kind, taskId: a.task?.id, taskTitle: a.task?.title,
                                    category: a.task?.category, preset: a.isStopwatch ? "stopwatch" : preset.name,
-                                   plannedS: a.isStopwatch ? focused : a.plannedS,
+                                   plannedS: a.isStopwatch || outcome == .switched ? focused : a.plannedS,
                                    startedAt: a.startedAt, endedAt: end, tz: tzName, focusedS: focused,
                                    outcome: outcome, stopReason: reason, pauses: a.pauses)
         if a.kind == .focus, outcome == .completed { cycleIndex = (cycleIndex + 1) % 4 }

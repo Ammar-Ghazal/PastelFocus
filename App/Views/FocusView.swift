@@ -141,11 +141,11 @@ struct FocusView: View {
         Menu {
             Section("Task") {
                 ForEach(model.openTasks) { t in
-                    Button { model.selectedTaskID = t.taskID } label: {
+                    Button { model.selectTask(t) } label: {
                         Label(t.title, systemImage: t.taskID == model.selectedTaskID ? "checkmark" : "circle")
                     }
                 }
-                Button("No task (Unassigned)") { model.selectedTaskID = nil }
+                Button("No task (Unassigned)") { model.selectTask(nil) }
             }
             Section("Breaks") {
                 Button("Short rest") { model.startRest(kind: .shortBreak) }

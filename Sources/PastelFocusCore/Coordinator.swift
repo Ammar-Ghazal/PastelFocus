@@ -133,11 +133,29 @@ public final class Coordinator {
 
     /// Starts focus on a task; returns a suggestion to show first, if any (shorter sessions).
     public func startFocus(task: TaskItem?, minutes: Int? = nil, stopwatch: Bool = false) throws {
-        let ref = task.flatMap { t in t.taskID.map { TaskRef(id: $0, title: t.title, category: t.category) } }
+        let ref = Self.ref(task)
         try engine.start(task: ref, minutes: minutes, stopwatch: stopwatch)
-        if let id = ref?.id, let t = store.find(id), t.status == .todo { try? perform { try $0.setStatus(id, .inProgress, actor: .app) } }
+        markInProgress(ref)
         saveEngine()
         writeNow()
+    }
+
+    /// Moves the running or paused focus session to another task (see `FocusEngine.switchTask`)
+    /// and records the part spent on the old one. Does nothing if it's already on that task.
+    public func switchFocus(to task: TaskItem?) throws {
+        let ref = Self.ref(task)
+        guard engine.active?.kind == .focus, engine.active?.task?.id != ref?.id else { return }
+        let record = try engine.switchTask(to: ref)
+        markInProgress(ref)
+        sessionEnded(record)
+    }
+
+    private static func ref(_ task: TaskItem?) -> TaskRef? {
+        task.flatMap { t in t.taskID.map { TaskRef(id: $0, title: t.title, category: t.category) } }
+    }
+
+    private func markInProgress(_ ref: TaskRef?) {
+        if let id = ref?.id, let t = store.find(id), t.status == .todo { try? perform { try $0.setStatus(id, .inProgress, actor: .app) } }
     }
 
     public func suggestionBeforeStart(minutes: Int) -> Suggestion? {

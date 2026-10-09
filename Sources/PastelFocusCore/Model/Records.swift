@@ -15,9 +15,12 @@ public enum SessionOutcome: String, Codable, Sendable {
     case pausedOut = "paused_out"
     case sleepInterrupted = "sleep_interrupted"
     case skipped
+    /// Handed over to another task mid-session; the timer carried on in a new session.
+    case switched
 
-    /// Anything other than finishing counts as an interruption for focus analytics.
-    public var isInterrupted: Bool { self != .completed }
+    /// Anything other than finishing counts as an interruption for focus analytics, except moving
+    /// to another task, which carries the session on rather than breaking it.
+    public var isInterrupted: Bool { self != .completed && self != .switched }
 }
 
 public struct PauseRecord: Codable, Sendable, Equatable {
