@@ -209,7 +209,7 @@ public enum GardenBuilder {
         case .shortBreak: return nil
         case .focus: break
         }
-        if s.outcome != .completed {
+        if s.outcome.isInterrupted {
             let composted = now.timeIntervalSince(s.endedAt) > 86_400
             return GardenItem(id: s.id, kind: composted ? .richSoil : .wilted, tag: nil, size: nil, variant: .normal, day: day, x: 0, y: 0)
         }

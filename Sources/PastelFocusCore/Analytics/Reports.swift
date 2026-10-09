@@ -42,7 +42,7 @@ public enum Rollups {
             switch s.kind {
             case .focus:
                 r.focusedS += s.focusedS
-                if s.outcome == .completed { r.completed += 1 } else { r.interrupted += 1 }
+                if s.outcome == .completed { r.completed += 1 } else if s.outcome.isInterrupted { r.interrupted += 1 }
                 r.focusedByCategory[s.category ?? "none", default: 0] += s.focusedS
                 r.firstStart = min(r.firstStart ?? s.startedAt, s.startedAt)
                 r.lastEnd = max(r.lastEnd ?? s.endedAt, s.endedAt)

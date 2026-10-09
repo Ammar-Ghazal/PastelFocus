@@ -40,6 +40,7 @@ public final class SessionRecorder {
         case .pausedOut: outcome = "paused out"
         case .sleepInterrupted: outcome = "sleep interrupted"
         case .skipped: outcome = "skipped"
+        case .switched: outcome = "switched task"
         }
         // The note shows a short label; the sessions log keeps the full text.
         if let r = s.stopReason, s.outcome == .stoppedEarly, !r.isEmpty { outcome += " (\(StopReasons.shorten(r)))" }

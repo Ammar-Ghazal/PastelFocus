@@ -177,6 +177,16 @@ struct TaskRow: View {
     @State private var hover = false
 
     var done: Bool { task.status == .done }
+    /// This task is in the running or paused focus session.
+    var inFocus: Bool { task.taskID != nil && task.taskID == model.activeTaskID }
+    var focusRunning: Bool { inFocus && model.phase == .running }
+
+    private var playHelp: String {
+        if focusRunning { return "Pause focus" }
+        if inFocus { return "Resume focus" }
+        if model.phase == .resting { return "Resting" }
+        return model.focusInSession ? "Move the focus session to this task" : "Start focus"
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -196,14 +206,18 @@ struct TaskRow: View {
             }
             .opacity(done ? 0.58 : 1)
             Spacer()
-            if task.priority >= .high, !done { TagChip(text: task.priority.label) }
+            if inFocus { TagChip(text: focusRunning ? "Focusing" : "Paused") }
+            else if task.priority >= .high, !done { TagChip(text: task.priority.label) }
             else if let c = task.isLater ? "Later" : task.category?.capitalized { TagChip(text: c) }
-            // Shown on hover (always on the highlighted row). The slot is kept when hidden so chips don't shift.
-            let showPlay = !done && (hover || highlighted)
-            Button { model.startFocus(on: task) } label: {
-                Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(theme.accent).frame(width: 28, height: 28)
+            // Shown on hover (always on the highlighted row and the task in focus). The slot is kept
+            // when hidden so chips don't shift.
+            let showPlay = !done && (hover || highlighted || inFocus)
+            Button { model.playPause(task) } label: {
+                Image(systemName: focusRunning ? "pause.fill" : "play.fill").font(.system(size: 12)).foregroundStyle(theme.accent)
+                    .frame(width: 28, height: 28).contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(.plain).help("Start focus")
+            .buttonStyle(.plain).help(playHelp).accessibilityLabel(playHelp)
+            .disabled(model.phase == .resting)
             .opacity(showPlay ? 1 : 0).allowsHitTesting(showPlay)
             Button { model.edit(task) } label: {
                 Image(systemName: "pencil").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textSecondary)
@@ -221,7 +235,7 @@ struct TaskRow: View {
         .help("Double-click to view or edit")
         .contextMenu { actions }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(task.priority == .none ? "" : ", \(task.priority.label.lowercased()) priority")")
+        .accessibilityLabel("\(task.title), \(done ? "done" : "not done")\(inFocus ? (focusRunning ? ", in focus" : ", focus paused") : "")\(task.priority == .none ? "" : ", \(task.priority.label.lowercased()) priority")")
     }
 }
 
@@ -229,7 +243,10 @@ extension TaskRow {
     /// Quick actions on right-click; the pencil opens the full editor.
     @ViewBuilder var actions: some View {
         Button("Edit…") { model.edit(task) }
-        Button("Start focus") { model.startFocus(on: task) }.disabled(done)
+        Button(focusRunning ? "Pause focus" : inFocus ? "Resume focus" : model.focusInSession ? "Move focus here" : "Start focus") {
+            model.playPause(task)
+        }
+        .disabled(done || model.phase == .resting)
         Picker("Priority", selection: Binding(get: { task.priority }, set: { model.setPriority(task, $0) })) {
             ForEach(Priority.levels, id: \.self) { Text($0.label).tag($0) }
             Text("None").tag(Priority.none)

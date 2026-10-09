@@ -57,6 +57,8 @@ final class AppModel: ObservableObject {
     @Published var activeTitle: String?
     @Published var activeKind: SessionKind?
     @Published var selectedTaskID: String?
+    /// The task of the running or paused focus session, shown as active in both panels.
+    @Published var activeTaskID: String?
     @Published var suggestion: Suggestion?
     @Published var lastEnded: SessionRecord?
     @Published var garden: Garden = .empty
@@ -195,6 +197,9 @@ final class AppModel: ObservableObject {
         remainingS = c.engine.remainingS
         plannedS = c.engine.active?.plannedS ?? c.engine.preset.focusMinutes * 60
         activeTitle = c.engine.active?.task?.title
+        let focusTaskID = c.engine.active?.kind == .focus ? c.engine.active?.task?.id : nil
+        if activeTaskID != focusTaskID { activeTaskID = focusTaskID }
+        if let id = focusTaskID { selectedTaskID = id } // the Focus panel shows what's running
         elapsedS = c.engine.elapsedS
         isStopwatch = c.engine.isStopwatch
         activeKind = c.engine.active?.kind
@@ -249,8 +254,11 @@ final class AppModel: ObservableObject {
 
     func count(_ f: TaskFilter) -> Int { tasks(for: f).count + upcoming(for: f).reduce(0) { $0 + $1.tasks.count } }
 
-    /// The first unfinished urgent or high-priority task in the list gets the highlighted row.
-    var highlightedID: String? { tasks.first { $0.status.isOpen && $0.priority >= .high }?.taskID }
+    /// The highlighted row: the task in focus, else the first unfinished urgent or high-priority task.
+    var highlightedID: String? { activeTaskID ?? tasks.first { $0.status.isOpen && $0.priority >= .high }?.taskID }
+
+    /// A focus session (running or paused) can move to another task.
+    var focusInSession: Bool { phase == .running || phase == .paused }
 
     // MARK: Tags
 
@@ -272,6 +280,12 @@ final class AppModel: ObservableObject {
     func toggle(_ t: TaskItem) {
         guard let id = t.taskID else { return }
         let target: TaskStatus = t.status == .done ? .todo : .done
+        // Finishing the task in focus ends its session too (and marks it done).
+        if target == .done, id == activeTaskID, focusInSession {
+            stop(reason: "done early")
+            toast = UndoToast(text: "Marked \"\(t.title)\" done", undo: {})
+            return
+        }
         do {
             try coordinator.perform { try $0.setStatus(id, target, actor: .you) }
             toast = UndoToast(text: target == .done ? "Marked \"\(t.title)\" done" : "Reopened \"\(t.title)\"") { [weak self] in
@@ -380,6 +394,27 @@ final class AppModel: ObservableObject {
 
     var selectedTask: TaskItem? { tasks.first { $0.taskID == selectedTaskID } }
     var openTasks: [TaskItem] { tasks.filter { $0.status.isOpen } }
+
+    /// Picks the task to focus on. During a session this moves the session to it (the time so
+    /// far stays with the previous task); otherwise it only selects it.
+    func selectTask(_ task: TaskItem?) {
+        guard focusInSession else { selectedTaskID = task?.taskID; return }
+        guard task?.taskID != activeTaskID else { return }
+        do { try coordinator.switchFocus(to: task) } catch { toast = UndoToast(text: "\(error)", undo: {}) }
+        publish()
+    }
+
+    /// The play/pause button on a Today row: pauses or resumes the task in focus, moves a running
+    /// session to this task, or starts focusing on it.
+    func playPause(_ task: TaskItem) {
+        if task.taskID != nil, task.taskID == activeTaskID {
+            phase == .running ? pause() : resume()
+        } else if focusInSession {
+            selectTask(task)
+        } else {
+            startFocus(on: task)
+        }
+    }
 
     func startFocus(on task: TaskItem? = nil, minutes: Int? = nil, skipSuggestion: Bool = false) {
         let t = task ?? selectedTask

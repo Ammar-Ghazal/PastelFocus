@@ -36,6 +36,47 @@ final class FocusEngineTests: XCTestCase {
         XCTAssertEqual(r.secondsToFirstInterruption, 600)
     }
 
+    func testSwitchingTaskSplitsTheSessionAndKeepsTheTimer() throws {
+        let clock = FixedClock("2026-10-07T06:00:00Z")
+        let e = FocusEngine(clock: clock)
+        try e.start(task: task)
+        clock.advance(600)
+        let other = TaskRef(id: "c4x8", title: "Pick countries", category: "career")
+        let r = try e.switchTask(to: other)
+        XCTAssertEqual(r.taskId, "r7q2")
+        XCTAssertEqual(r.outcome, .switched)
+        XCTAssertFalse(r.outcome.isInterrupted)
+        XCTAssertEqual(r.focusedS, 600)
+        XCTAssertEqual(r.plannedS, 600) // the rest of the plan moved to the next session
+        XCTAssertEqual(e.phase, .running)
+        XCTAssertEqual(e.active?.task, other)
+        XCTAssertEqual(e.remainingS, 900)
+        clock.advance(900)
+        XCTAssertEqual(try XCTUnwrap(e.tick()).outcome, .completed)
+        XCTAssertEqual(e.nextRestKind, .shortBreak) // one focus block, not two
+    }
+
+    func testSwitchingWhilePausedStaysPausedAndStopwatchRestarts() throws {
+        let clock = FixedClock("2026-10-07T06:00:00Z")
+        let e = FocusEngine(clock: clock)
+        try e.start(task: task, stopwatch: true)
+        clock.advance(300)
+        try e.pause()
+        let r = try e.switchTask(to: nil)
+        XCTAssertEqual(r.focusedS, 300)
+        XCTAssertEqual(e.phase, .paused)
+        XCTAssertTrue(e.isStopwatch)
+        XCTAssertEqual(e.elapsedS, 0)
+        XCTAssertNil(e.active?.task)
+    }
+
+    func testCannotSwitchWhenIdleOrResting() throws {
+        let e = FocusEngine(clock: FixedClock("2026-10-07T06:00:00Z"))
+        XCTAssertThrowsError(try e.switchTask(to: task))
+        try e.startRest()
+        XCTAssertThrowsError(try e.switchTask(to: task))
+    }
+
     func testStopEarlyIsLoggedWithReason() throws {
         let clock = FixedClock("2026-10-07T06:00:00Z")
         let e = FocusEngine(clock: clock)
