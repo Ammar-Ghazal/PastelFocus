@@ -79,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let t = model.theme
+        saveWindow("task-picker", size: CGSize(width: 300, height: 200), TaskPickerList {}.padding(10).frame(maxHeight: .infinity, alignment: .top))
         save("today-min-height", TodayView().frame(height: TodayView.heightRange.lowerBound).environment(\.theme, t))
         save("dial-idle", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))
         save("dial-stopwatch", TimerDial(minutes: 25, progress: 0.3, clock: "18:05", caption: "elapsed", onCommit: { _ in }, editable: false).padding(10).environment(\.theme, t))

@@ -11,6 +11,7 @@ struct FocusView: View {
     @State private var hover = false
     @State private var askingReason = false
     @State private var breathe = false
+    @State private var picking = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -24,8 +25,7 @@ struct FocusView: View {
                 TimerDial(minutes: model.settings.focusMinutes, progress: dialProgress, clock: clock,
                           caption: dialCaption, onCommit: { model.setFocusMinutes($0) }, editable: !stopwatch)
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textPrimary)
-                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    TaskPickerButton(title: label, open: picking, enabled: canPick) { if !snapshot { setPicking(!picking) } }
                     HStack(spacing: 10) {
                         playButton
                         if model.phase != .idle {
@@ -49,7 +49,28 @@ struct FocusView: View {
         .frame(width: 300, height: 200, alignment: .topLeading)
         .background(GlassBackground(radius: 18))
         .onHover { hover = $0 }
+        .overlay(alignment: .top) { picker }
         .overlay { cards }
+        .onChange(of: canPick) { _, can in if !can { setPicking(false) } }
+    }
+
+    /// The task can be chosen while idle or during a focus session, not during a rest.
+    private var canPick: Bool { model.phase == .idle || model.focusInSession }
+
+    private func setPicking(_ on: Bool) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.82)) { picking = on }
+    }
+
+    @ViewBuilder private var picker: some View {
+        if picking {
+            ZStack(alignment: .top) {
+                // Clicking anywhere else closes it.
+                Color.black.opacity(0.001).onTapGesture { setPicking(false) }
+                TaskPickerList { setPicking(false) }
+                    .padding(.horizontal, 10).padding(.top, 44)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.92, anchor: .top).combined(with: .opacity).combined(with: .offset(y: -6)))
+            }
+        }
     }
 
     /// Stopwatch look: idle in stopwatch mode, or a running stopwatch session.
@@ -139,14 +160,6 @@ struct FocusView: View {
 
     private var menu: some View {
         Menu {
-            Section("Task") {
-                ForEach(model.openTasks) { t in
-                    Button { model.selectTask(t) } label: {
-                        Label(t.title, systemImage: t.taskID == model.selectedTaskID ? "checkmark" : "circle")
-                    }
-                }
-                Button("No task (Unassigned)") { model.selectTask(nil) }
-            }
             Section("Breaks") {
                 Button("Short rest") { model.startRest(kind: .shortBreak) }
                 Button("Long rest") { model.startRest(kind: .longBreak) }
