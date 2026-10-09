@@ -205,12 +205,12 @@ struct TaskRow: View {
             }
             .buttonStyle(.plain).help("Start focus")
             .opacity(showPlay ? 1 : 0).allowsHitTesting(showPlay)
-            if snapshot {
-                Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary).frame(width: 28)
-            } else {
-                Menu { actions } label: { Image(systemName: "ellipsis").foregroundStyle(theme.textSecondary) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
+            Button { model.edit(task) } label: {
+                Image(systemName: "pencil").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.textSecondary)
+                    .frame(width: 28, height: 28).contentShape(Rectangle())
             }
+            .buttonStyle(.plain).help("Edit task")
+            .accessibilityLabel("Edit \(task.title)")
         }
         .padding(.horizontal, 14).frame(height: 60)
         .background(RoundedRectangle(cornerRadius: 10).fill(highlighted && !done ? theme.highlight : (hover ? Color.white.opacity(0.035) : .clear)))
@@ -226,7 +226,7 @@ struct TaskRow: View {
 }
 
 extension TaskRow {
-    /// The ⋯ menu, also shown on right-click.
+    /// Quick actions on right-click; the pencil opens the full editor.
     @ViewBuilder var actions: some View {
         Button("Edit…") { model.edit(task) }
         Button("Start focus") { model.startFocus(on: task) }.disabled(done)
