@@ -2,7 +2,7 @@ import AppKit
 import PastelFocusCore
 import SwiftUI
 
-/// One editor window per task, opened by double-clicking a Today row (or ⋯ → Edit…).
+/// One editor window per task, opened by a Today row's pencil, a double-click or right-click → Edit….
 @MainActor
 final class TaskEditorWindows {
     private var windows: [String: NSWindow] = [:]
