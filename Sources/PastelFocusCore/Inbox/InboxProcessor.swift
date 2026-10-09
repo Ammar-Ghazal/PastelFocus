@@ -17,6 +17,9 @@ public enum InboxCommand: Equatable {
     case cancel(id: String)
     case later(id: String)
     case progress(id: String, percent: Int)
+    /// Start time and length; both nil clears them.
+    case schedule(id: String, start: String?, minutes: Int?)
+    case repeats(id: String, rule: String?)
     case suggestFocus(id: String, minutes: Int)
     case startFocus(id: String, minutes: Int)
     case linkSession(sessionId: String, taskId: String)
@@ -39,7 +42,7 @@ public final class InboxProcessor {
     public static let header = [
         "# PastelFocus Inbox", "",
         "Hermes (or you) can add one command per line as `- [ ] <command>`. PastelFocus applies it within a second and ticks it with the result.", "",
-        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `progress 🆔 id 60` (overall %, 100 completes it) · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
+        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `progress 🆔 id 60` (overall %, 100 completes it) · `schedule 🆔 id 07:00 - 07:45` (or `45m`, `none`) · `repeat 🆔 id every weekday` (or `never`) · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
         "## Commands", "",
     ]
 
@@ -91,6 +94,24 @@ public final class InboxProcessor {
         case "reopen": cmd = .reopen(id: try needID())
         case "cancel": cmd = .cancel(id: try needID())
         case "later": cmd = .later(id: try needID())
+        case "schedule":
+            let stripped = rest.replacingOccurrences(of: #"🆔\s*[A-Za-z0-9_-]+"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespaces)
+            if stripped.lowercased() == "none" { cmd = .schedule(id: try needID(), start: nil, minutes: nil); break }
+            if let (start, length, tail) = TaskTime.leading(stripped) {
+                let minutes = length ?? TaskLineParser.parseMinutes(tail.replacingOccurrences(of: "for", with: ""))
+                cmd = .schedule(id: try needID(), start: start, minutes: minutes)
+            } else if let minutes = TaskLineParser.parseMinutes(stripped.replacingOccurrences(of: "for", with: "")) {
+                cmd = .schedule(id: try needID(), start: nil, minutes: minutes)
+            } else {
+                throw InboxError("missing time (HH:MM, HH:MM - HH:MM, a length like 45m, or none)")
+            }
+        case "repeat":
+            let stripped = rest.replacingOccurrences(of: #"🆔\s*[A-Za-z0-9_-]+"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: "🔁", with: "").trimmingCharacters(in: .whitespaces)
+            if ["never", "none"].contains(stripped.lowercased()) { cmd = .repeats(id: try needID(), rule: nil); break }
+            guard Recurrence(stripped) != nil else { throw InboxError("unknown repeat rule \"\(stripped)\" (see docs/TASK_FORMAT.md)") }
+            cmd = .repeats(id: try needID(), rule: stripped)
         case "progress":
             let stripped = rest.replacingOccurrences(of: #"🆔\s*[A-Za-z0-9_-]+"#, with: "", options: .regularExpression)
             guard let n = Self.match(#"(\d+)\s*%?"#, in: stripped).flatMap(Int.init), (0...100).contains(n) else {
@@ -157,6 +178,8 @@ public final class InboxProcessor {
             case .cancel(let id): try store.setStatus(id, .cancelled, actor: p.actor, reason: p.reason)
             case .later(let id): try store.addTag(id, "later", actor: p.actor)
             case .progress(let id, let n): try store.setProgress(id, n, actor: p.actor, reason: p.reason)
+            case .schedule(let id, let start, let minutes): try store.setTime(id, start: start, minutes: minutes, actor: p.actor, reason: p.reason)
+            case .repeats(let id, let rule): try store.setRecurrence(id, rule, actor: p.actor, reason: p.reason)
             case .suggestFocus(let id, let minutes):
                 guard let t = store.find(id) else { throw InboxError("no task 🆔 \(id)") }
                 guard let actions, actions.suggestFocus(task: t, minutes: minutes, why: p.reason) else {

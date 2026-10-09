@@ -106,7 +106,7 @@ struct SettingsView: View {
                 Picker("Sort tasks by", selection: $settings.taskSort) {
                     ForEach(TaskSort.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
-                Text("Unfinished tasks come first, then tasks moved to Later, then finished ones. Priority order is Urgent, High, Medium, no priority, Low; the other sorts use priority to break ties.")
+                Text("Unfinished tasks come first, then tasks moved to Later, then finished ones. Time of day lists tasks with a time first, earliest first. Priority order is Urgent, High, Medium, no priority, Low; the other sorts use priority to break ties.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Night Garden") {

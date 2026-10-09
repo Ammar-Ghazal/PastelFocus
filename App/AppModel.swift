@@ -321,9 +321,14 @@ final class AppModel: ObservableObject {
             return
         }
         do {
-            try coordinator.perform { try $0.setStatus(id, target, actor: .you) }
-            toast = UndoToast(text: target == .done ? "Marked \"\(t.title)\" done" : "Reopened \"\(t.title)\"") { [weak self] in
-                try? self?.coordinator.perform { try $0.setStatus(id, t.status, actor: .you) }
+            var next: TaskItem? // a repeating task's next occurrence, added on completion
+            try coordinator.perform { next = try $0.setStatus(id, target, actor: .you) }
+            let label = target == .done ? "Marked \"\(t.title)\" done" + (next.map { n in " · next on \(n.scheduled ?? coordinator.today)" } ?? "") : "Reopened \"\(t.title)\""
+            toast = UndoToast(text: label) { [weak self] in
+                try? self?.coordinator.perform { store in
+                    if let nid = next?.taskID { _ = try? store.delete(nid, actor: .you) }
+                    try store.setStatus(id, t.status, actor: .you)
+                }
                 self?.publish()
             }
         } catch { toast = UndoToast(text: "\(error)", undo: {}) }

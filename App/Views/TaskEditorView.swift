@@ -51,6 +51,8 @@ struct TaskEditorView: View {
     @State private var due: String?
     @State private var start: String?
     @State private var recurrence: String
+    @State private var startTime: String?
+    @State private var duration: Int?
     @State private var notes: String
     @State private var newTag = ""
     @State private var error: String?
@@ -68,6 +70,8 @@ struct TaskEditorView: View {
         _due = State(initialValue: original.due)
         _start = State(initialValue: original.start)
         _recurrence = State(initialValue: original.recurrence ?? "")
+        _startTime = State(initialValue: original.startTime)
+        _duration = State(initialValue: original.durationMinutes)
         _notes = State(initialValue: original.notes.joined(separator: "\n"))
     }
 
@@ -119,16 +123,19 @@ struct TaskEditorView: View {
                     DayField(label: "Scheduled", day: $scheduled, placeholder: noteDay.map { "From its note (\($0))" } ?? "Not set")
                     DayField(label: "Due", day: $due)
                     DayField(label: "Starts", day: $start)
-                    LabeledContent("Repeats") {
-                        TextField("Repeats", text: $recurrence, prompt: Text("Never, or e.g. every day")).labelsHidden()
-                            .multilineTextAlignment(.trailing)
+                    TimeField(time: $startTime)
+                    Picker("Length", selection: $duration) {
+                        Text("None").tag(Int?.none)
+                        ForEach(Self.lengths(including: duration), id: \.self) { m in Text(GoodDay.label(m)).tag(Int?.some(m)) }
                     }
+                    RepeatField(text: $recurrence)
                     if let c = original.created { LabeledContent("Created", value: c) }
                     if let c = original.completed { LabeledContent("Completed", value: c) }
                 } header: {
-                    Text("Dates")
+                    Text("Schedule")
                 } footer: {
-                    Text("Repeating tasks show only their current day, not upcoming ones.").font(.caption).foregroundStyle(.secondary)
+                    Text("A repeating task is one line: ticking it off adds the next one on its day. Today shows only its current day.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
                     TextEditor(text: $notes).font(.system(size: 13)).frame(minHeight: 70)
@@ -233,13 +240,143 @@ struct TaskEditorView: View {
         edited.due = due
         edited.start = start
         let rule = recurrence.replacingOccurrences(of: "🔁", with: "").trimmingCharacters(in: .whitespaces)
-        guard rule.range(of: #"^[A-Za-z0-9,! ]*$"#, options: .regularExpression) != nil else {
-            error = "Repeats takes words like \"every day\" or \"every week on Monday\"."
+        guard rule.isEmpty || Recurrence(rule) != nil else {
+            error = "Repeats takes words like \"every day\", \"every weekday\" or \"every 2 weeks on Monday\"."
             return
         }
-        edited.recurrence = rule.isEmpty ? nil : rule
+        edited.recurrence = rule.isEmpty ? nil : (Recurrence(rule)?.text ?? rule)
+        edited.startTime = startTime
+        edited.durationMinutes = duration
         edited.notes = notes.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         if let e = model.saveEdit(original, edited) { error = e } else { close() }
+    }
+}
+
+extension TaskEditorView {
+    /// Lengths offered in the menu, plus the task's own if it's something else.
+    static func lengths(including m: Int?) -> [Int] {
+        let base = [15, 25, 30, 45, 60, 90, 120, 180, 240]
+        return m.map { base.contains($0) ? base : (base + [$0]).sorted() } ?? base
+    }
+}
+
+/// An optional time of day ("HH:MM").
+private struct TimeField: View {
+    @Binding var time: String?
+
+    var body: some View {
+        LabeledContent("Time") {
+            HStack(spacing: 10) {
+                if let t = time, let m = TaskTime.minutes(t) {
+                    DatePicker("Time", selection: Binding(get: { Self.date(m) }, set: { time = Self.string($0) }), displayedComponents: .hourAndMinute)
+                        .labelsHidden().datePickerStyle(.field)
+                        .environment(\.timeZone, Self.utc.timeZone)
+                } else {
+                    Text("Any time").foregroundStyle(.secondary)
+                }
+                Toggle("Time", isOn: Binding(get: { time != nil }, set: { time = $0 ? (time ?? "09:00") : nil }))
+                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
+        }
+    }
+
+    // A fixed reference day in UTC, so the picker shows the stored clock time unchanged.
+    static var utc: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }
+    static func date(_ minutes: Int) -> Date { Date(timeIntervalSinceReferenceDate: TimeInterval(minutes * 60)) }
+    static func string(_ d: Date) -> String {
+        let c = utc.dateComponents([.hour, .minute], from: d)
+        return TaskTime.string((c.hour ?? 0) * 60 + (c.minute ?? 0))
+    }
+}
+
+/// The repeat rule: never, the common choices, weekly or biweekly on chosen days, or your own words.
+private struct RepeatField: View {
+    @Binding var text: String
+
+    enum Choice: String, CaseIterable, Identifiable {
+        case never, daily, weekdays, weekends, weekly, biweekly, monthly, custom
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .never: return "Never"
+            case .daily: return "Every day"
+            case .weekdays: return "Every weekday (Mon–Fri)"
+            case .weekends: return "Every weekend (Sat, Sun)"
+            case .weekly: return "Every week on…"
+            case .biweekly: return "Every 2 weeks on…"
+            case .monthly: return "Every month"
+            case .custom: return "Custom…"
+            }
+        }
+    }
+
+    private var rule: Recurrence? { Recurrence(text) }
+
+    private var choice: Choice {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return .never }
+        guard let r = rule, !r.whenDone else { return .custom }
+        switch (r.unit, r.interval) {
+        case (.day, 1): return .daily
+        case (.week, 1) where r.weekdays == [1, 2, 3, 4, 5]: return .weekdays
+        case (.week, 1) where r.weekdays == [6, 7]: return .weekends
+        case (.week, 1): return .weekly
+        case (.week, 2): return .biweekly
+        case (.month, 1): return .monthly
+        default: return .custom
+        }
+    }
+
+    var body: some View {
+        Picker("Repeats", selection: Binding(get: { choice }, set: set)) {
+            ForEach(Choice.allCases) { Text($0.label).tag($0) }
+        }
+        if choice == .weekly || choice == .biweekly {
+            LabeledContent("On") {
+                HStack(spacing: 4) {
+                    ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { i, letter in
+                        let day = i + 1
+                        let on = rule?.weekdays.contains(day) ?? false
+                        Button { toggle(day) } label: {
+                            Text(letter).font(.system(size: 12, weight: on ? .bold : .regular))
+                                .foregroundStyle(on ? Color.white : Color.primary)
+                                .frame(width: 26, height: 24)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(on ? Color.accentColor : Color.secondary.opacity(0.18)))
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                            .accessibilityLabel(Calendar.current.weekdaySymbols[day % 7])
+                            .accessibilityAddTraits(on ? .isSelected : [])
+                    }
+                }
+            }
+        }
+        if choice == .custom {
+            TextField("Rule", text: $text, prompt: Text("e.g. every 3 days, every month when done"))
+                .foregroundStyle(text.isEmpty || rule != nil ? Color.primary : Color.red)
+        }
+    }
+
+    private func set(_ c: Choice) {
+        switch c {
+        case .never: text = ""
+        case .daily: text = "every day"
+        case .weekdays: text = "every weekday"
+        case .weekends: text = "every weekend"
+        case .weekly, .biweekly:
+            // Keep the chosen days when switching between weekly and biweekly; otherwise start on Monday.
+            let keep = choice == .weekly || choice == .biweekly
+            let days = keep ? (rule?.weekdays ?? []) : []
+            text = Recurrence(interval: c == .weekly ? 1 : 2, unit: .week, weekdays: days.isEmpty ? [1] : days).text
+        case .monthly: text = "every month"
+        case .custom: if rule == nil && text.isEmpty { text = "every 3 days" }
+        }
+    }
+
+    private func toggle(_ day: Int) {
+        guard var r = rule else { return }
+        if r.weekdays.contains(day) { if r.weekdays.count > 1 { r.weekdays.remove(day) } } else { r.weekdays.insert(day) }
+        text = r.text
     }
 }
 
