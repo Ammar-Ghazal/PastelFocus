@@ -181,6 +181,7 @@ public final class TaskStore {
             let old = t.status
             t.status = status
             t.completed = status == .done ? day : nil
+            if status.isOpen, t.progress == 100 { t.progress = nil }
             let type: TaskEventType = switch status {
             case .done: .completed
             case .cancelled: .cancelled
@@ -208,6 +209,26 @@ public final class TaskStore {
             t.priority = p
             t.priorityFromLegacy = false
             return [TaskEvent(at: now, taskId: id, type: .priorityChanged, field: "priority", old: "\(old.rawValue)", new: "\(p.rawValue)", actor: actor)]
+        }
+    }
+
+    /// Records how much of the whole task is done (0–100). Reaching 100 completes the task, so it
+    /// shows as done everywhere: Today, Now.md, the note and Hermes.
+    public func setProgress(_ id: String, _ percent: Int, actor: Actor, reason: String? = nil) throws {
+        let p = min(100, max(0, percent))
+        let now = clock.now(), day = today
+        try mutate(id, actor: actor, reason: reason) { t in
+            var out: [TaskEvent] = []
+            if t.progress != p {
+                out.append(TaskEvent(at: now, taskId: id, type: .progressChanged, field: "progress", old: t.progress.map(String.init), new: "\(p)", actor: actor))
+                t.progress = p
+            }
+            if p == 100, t.status != .done {
+                out.append(TaskEvent(at: now, taskId: id, type: .completed, field: "status", old: t.status.rawValue, new: TaskStatus.done.rawValue, actor: actor))
+                t.status = .done
+                t.completed = day
+            }
+            return out
         }
     }
 
@@ -266,10 +287,16 @@ public final class TaskStore {
                 // priority as an emoji instead.
                 if TaskLineParser.stripLegacyMarker(t.description) == t.description { t.priorityFromLegacy = false }
             }
+            if edited.progress != original.progress { t.progress = edited.progress }
             if edited.status != original.status {
                 t.status = edited.status
                 t.completed = edited.status == .done ? (t.completed ?? day) : nil
             }
+            // Same rule as `setProgress`: 100% is done; reopening a 100% task clears it.
+            if t.progress == 100, t.status != .done, edited.progress != original.progress {
+                t.status = .done
+                t.completed = t.completed ?? day
+            } else if t.status.isOpen, t.progress == 100 { t.progress = nil }
             if edited.priority != original.priority { t.priority = edited.priority; t.priorityFromLegacy = false }
             if edited.scheduled != original.scheduled { t.scheduled = edited.scheduled }
             if edited.due != original.due { t.due = edited.due }

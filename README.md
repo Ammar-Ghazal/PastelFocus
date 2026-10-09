@@ -74,7 +74,7 @@ Legacy Hermes lines (`- [ ] **P1 · 90 min** Title — detail`) are still read: 
 
 ### Inbox commands
 
-`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete|reopen|cancel|later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …` (the old `estimate` command now answers with an error), with an Undo toast in the app.
+`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete|reopen|cancel|later 🆔 id` · `progress 🆔 id 60` (overall %, 100 completes) · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …` (the old `estimate` command now answers with an error), with an Undo toast in the app.
 
 ## Analytics and suggestions
 
@@ -88,6 +88,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 - **Stopwatch mode:** the toggle in the header switches to counting up. Stopping a stopwatch finishes it (logged as completed, `preset: "stopwatch"`, planned = actual); a forgotten one stops itself after 4 h.
 - **Choosing the task:** click the task name next to the dial to open a dropdown of today's open tasks (or *No task*). While idle it picks the next task; during a session it moves the session to the one you pick (see below). Esc or a click outside closes it.
 - **Both panels agree:** the task in focus is highlighted in Today with a *Focusing* (or *Paused*) chip, and its play button becomes pause/resume. Starting another task's play button, or picking a task in the Focus dropdown, during a session moves the session to that task: the time so far is logged for the old task as `switched` (not an interruption, no wilted plant) and the timer carries on (a countdown keeps its time left; a stopwatch counts from zero). Ticking the task in focus done in Today ends its session. Rows can't start focus during a rest.
+- **Progress after a session:** when a focus session on a task finishes (or you stop it), the panel asks how far along the whole task is: a 0–100% slider, *Save*, *It's done* or *Skip*. It is saved as `[progress:: 60]` on the line and shown on the Today row. 100% completes the task, so it is done everywhere (Today, Now.md, the note, Hermes); reopening a task that was at 100% clears its progress. Not asked after a switch, a pause or sleep timeout, or *done early*. The editor can set it too, and Hermes can with `progress 🆔 id 60`.
 - **Stop early:** quick reasons (`interrupted`, `blocked`, `done early`), your saved reasons, or type your own and tick *Save as a quick reason*. Saved reasons are shortened to 22 characters at a word boundary; right-click one to remove it. The daily note shows the short label; the sessions log keeps your full text.
 
 ## Themes

@@ -75,6 +75,9 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     /// Minutes of focus logged on the task (`[spent:: 1h 25m]`). The app keeps it in step with the
     /// sessions log.
     public var spentMinutes: Int?
+    /// How much of the whole task is done, 0–100 (`[progress:: 60]`), as reported after a focus
+    /// session. Nil until reported.
+    public var progress: Int?
     /// Fields from before time tracking: `[est:: N]` and `[sessions:: N]`. Read so they can be
     /// migrated, never written back.
     public var legacyEstimate: Int?
@@ -97,7 +100,7 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
 
     public init(taskID: String? = nil, status: TaskStatus = .todo, description: String,
                 priority: Priority = .none, priorityFromLegacy: Bool = false,
-                spentMinutes: Int? = nil, legacyEstimate: Int? = nil, legacySessions: Int? = nil,
+                spentMinutes: Int? = nil, progress: Int? = nil, legacyEstimate: Int? = nil, legacySessions: Int? = nil,
                 created: String? = nil, scheduled: String? = nil, due: String? = nil,
                 start: String? = nil, completed: String? = nil, recurrence: String? = nil, notes: [String] = [],
                 file: String = "", lineIndex: Int = 0, indent: String = "") {
@@ -107,6 +110,7 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
         self.priority = priority
         self.priorityFromLegacy = priorityFromLegacy
         self.spentMinutes = spentMinutes
+        self.progress = progress
         self.legacyEstimate = legacyEstimate
         self.legacySessions = legacySessions
         self.created = created

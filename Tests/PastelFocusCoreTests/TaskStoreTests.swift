@@ -165,6 +165,30 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-07")), lines)
     }
 
+    func testProgressIsRecordedAndHundredCompletes() throws {
+        try store.setProgress("c4x8", 60, actor: .you)
+        XCTAssertEqual(store.find("c4x8")?.progress, 60)
+        XCTAssertEqual(store.find("c4x8")?.status, .todo)
+        XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("Pick target countries #career [progress:: 60] 🔼 🆔 c4x8"))
+        try store.setProgress("c4x8", 100, actor: .you)
+        let done = try XCTUnwrap(store.find("c4x8"))
+        XCTAssertEqual(done.status, .done)
+        XCTAssertEqual(done.completed, "2026-10-07")
+        XCTAssertTrue(store.todayTasks(store.scan().tasks).contains { $0.taskID == "c4x8" && $0.status == .done })
+        XCTAssertEqual(store.events.readAll().filter { $0.taskId == "c4x8" }.map(\.type), [.progressChanged, .progressChanged, .completed])
+        // Reopened, it no longer claims to be 100% done.
+        try store.setStatus("c4x8", .todo, actor: .you)
+        XCTAssertNil(store.find("c4x8")?.progress)
+    }
+
+    func testEditorProgressOfHundredCompletes() throws {
+        let original = try XCTUnwrap(store.find("c4x8"))
+        var edited = original
+        edited.progress = 100
+        let saved = try store.apply("c4x8", from: original, to: edited, actor: .you)
+        XCTAssertEqual(saved.status, .done)
+    }
+
     func testEditorSetsAndClearsRepeat() throws {
         let original = try XCTUnwrap(store.find("c4x8"))
         var edited = original
