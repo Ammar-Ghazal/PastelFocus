@@ -176,6 +176,10 @@ struct FocusView: View {
                 model.stop(reason: reason)
             } cancel: { askingReason = false }
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        } else if let p = model.progressPrompt {
+            ProgressCard(prompt: p) { model.reportProgress($0) }
+                .id(p) // a new session's prompt starts from its own value
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
         } else if let s = model.suggestion {
             SuggestionCard(title: s.title, why: s.why, accept: actionTitle(s.action)) { model.answer(.accepted) } notNow: { model.answer(.dismissed) } mute: { model.answer(.muted) }
         } else if let (task, minutes, why) = model.hermesCard {

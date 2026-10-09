@@ -201,6 +201,7 @@ struct TaskRow: View {
                     if task.isRepeating { Image(systemName: "repeat").help("Repeats \(task.recurrence ?? "")") }
                     if let s = task.subtitle { Text(s).lineLimit(1) }
                     if let m = task.spentMinutes, m > 0 { Text("· \(GoodDay.label(m))").help("Time spent") }
+                    if let p = task.progress, !done { Text("· \(p)%").help("How much of the task is done") }
                 }
                 .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
             }

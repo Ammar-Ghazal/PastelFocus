@@ -25,6 +25,13 @@ final class TickState: ObservableObject {
     @Published var elapsedS = 0
 }
 
+/// "How far along is this task?" — asked in the Focus panel after a focus session you ended.
+struct ProgressPrompt: Hashable {
+    let taskID: String
+    let title: String
+    let current: Int?
+}
+
 struct UndoToast: Identifiable, Equatable {
     let id = UUID()
     let text: String
@@ -61,6 +68,7 @@ final class AppModel: ObservableObject {
     @Published var activeTaskID: String?
     @Published var suggestion: Suggestion?
     @Published var lastEnded: SessionRecord?
+    @Published var progressPrompt: ProgressPrompt?
     @Published var garden: Garden = .empty
     /// Tags and the plant slot each grows (PastelFocus/Tags.md).
     @Published var tags = TagRegistry()
@@ -448,6 +456,18 @@ final class AppModel: ObservableObject {
         publish()
     }
 
+    /// Answers the progress prompt; nil skips it. 100% completes the task everywhere.
+    func reportProgress(_ percent: Int?) {
+        guard let p = progressPrompt else { return }
+        progressPrompt = nil
+        guard let percent else { return }
+        do {
+            try coordinator.perform { try $0.setProgress(p.taskID, percent, actor: .you) }
+            if percent == 100 { toast = UndoToast(text: "Marked \"\(p.title)\" done", undo: {}) }
+        } catch { toast = UndoToast(text: "\(error)", undo: {}) }
+        publish()
+    }
+
     func startRest(kind: SessionKind? = nil, minutes: Int? = nil) {
         try? coordinator.engine.startRest(kind: kind, minutes: minutes)
         coordinator.saveEngine()
@@ -488,6 +508,12 @@ final class AppModel: ObservableObject {
 
     private func ended(_ r: SessionRecord) {
         lastEnded = r
+        // Ask after sessions that finished or that you stopped; not after a switch (you moved on),
+        // a pause or sleep timeout (you weren't there), or "done early" (it's done).
+        if r.kind == .focus, r.outcome == .completed || r.outcome == .stoppedEarly, r.stopReason != "done early",
+           let id = r.taskId, let t = coordinator.store.find(id), t.status.isOpen {
+            progressPrompt = ProgressPrompt(taskID: id, title: t.title, current: t.progress)
+        }
         if let s = coordinator.sessionEnded(r) { present(s) }
         publish()
     }

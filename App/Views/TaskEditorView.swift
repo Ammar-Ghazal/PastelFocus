@@ -45,6 +45,7 @@ struct TaskEditorView: View {
     @State private var details: String
     @State private var tags: [String]
     @State private var status: TaskStatus
+    @State private var progress: Int?
     @State private var priority: Priority
     @State private var scheduled: String?
     @State private var due: String?
@@ -61,6 +62,7 @@ struct TaskEditorView: View {
         _details = State(initialValue: original.subtitle ?? "")
         _tags = State(initialValue: original.tags)
         _status = State(initialValue: original.status)
+        _progress = State(initialValue: original.progress)
         _priority = State(initialValue: original.priority)
         _scheduled = State(initialValue: original.scheduled)
         _due = State(initialValue: original.due)
@@ -96,6 +98,20 @@ struct TaskEditorView: View {
                         Text("Done").tag(TaskStatus.done)
                         Text("Cancelled").tag(TaskStatus.cancelled)
                     }
+                    LabeledContent("Progress") {
+                        HStack(spacing: 8) {
+                            if let p = progress {
+                                Slider(value: Binding(get: { Double(p) }, set: { progress = Int($0) }), in: 0...100, step: 5)
+                                    .frame(maxWidth: 160).accessibilityLabel("Progress")
+                                Text("\(p)%").monospacedDigit().frame(width: 38, alignment: .trailing)
+                            } else {
+                                Text("Not reported").foregroundStyle(.secondary)
+                            }
+                            Toggle("Progress", isOn: Binding(get: { progress != nil }, set: { progress = $0 ? (progress ?? 50) : nil }))
+                                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                        }
+                    }
+                    .help("How much of the whole task is done; 100% completes it")
                     LabeledContent("Time spent", value: (original.spentMinutes ?? 0) > 0 ? GoodDay.label(original.spentMinutes!) : "None yet")
                         .help("Logged from focus sessions on this task")
                 }
@@ -211,6 +227,7 @@ struct TaskEditorView: View {
                 .joined(separator: " ").replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
         }
         edited.status = status
+        edited.progress = progress
         edited.priority = priority
         edited.scheduled = scheduled
         edited.due = due

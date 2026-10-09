@@ -73,6 +73,7 @@ public enum TaskEventType: String, Codable, Sendable {
     /// No longer written (estimates were replaced by time spent); kept so older logs still read.
     case estimateChanged = "estimate_changed"
     case sessionLinked = "session_linked"
+    case progressChanged = "progress_changed"
 }
 
 public enum Actor: String, Codable, Sendable {

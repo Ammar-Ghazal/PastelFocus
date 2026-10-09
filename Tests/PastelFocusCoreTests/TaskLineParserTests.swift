@@ -34,6 +34,14 @@ final class TaskLineParserTests: XCTestCase {
         XCTAssertEqual([25, 60, 85].map(TaskLineParser.formatMinutes), ["25m", "1h", "1h 25m"])
     }
 
+    func testProgressRoundTrips() throws {
+        let line = "- [/] Draft report #writing [spent:: 50m] [progress:: 60] 🆔 dr01"
+        let t = try XCTUnwrap(TaskLineParser.parse(line))
+        XCTAssertEqual(t.progress, 60)
+        XCTAssertEqual(TaskLineParser.serialize(t), line)
+        XCTAssertEqual(TaskLineParser.parse("- [ ] X [progress:: 140%] 🆔 x")?.progress, 100)
+    }
+
     func testOldSessionFieldsAreReadButBecomeTime() throws {
         let t = try XCTUnwrap(TaskLineParser.parse("- [ ] Resume #career [est:: 3] [sessions:: 2] 🆔 r7q2"))
         XCTAssertEqual(t.legacyEstimate, 3)

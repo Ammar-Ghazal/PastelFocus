@@ -79,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let t = model.theme
+        saveWindow("progress-card", size: CGSize(width: 300, height: 200), ProgressCard(prompt: ProgressPrompt(taskID: "demo", title: "Practice a mock interview", current: 40)) { _ in }.frame(maxHeight: .infinity, alignment: .top))
         saveWindow("task-picker", size: CGSize(width: 300, height: 200), TaskPickerList {}.padding(10).frame(maxHeight: .infinity, alignment: .top))
         save("today-min-height", TodayView().frame(height: TodayView.heightRange.lowerBound).environment(\.theme, t))
         save("dial-idle", TimerDial(minutes: 40, progress: nil, clock: "", caption: "min", onCommit: { _ in }).padding(10).environment(\.theme, t))

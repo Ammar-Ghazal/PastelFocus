@@ -9,7 +9,7 @@ public enum TaskLineParser {
     static let priorityField = try! NSRegularExpression(pattern: #"\s*(🔺|⏫|🔼|🔽|⏬)️?"#)
     /// The rule runs to the next field or tag, as the Tasks plugin reads it: `🔁 every week on Monday`.
     static let recurrenceField = try! NSRegularExpression(pattern: #"\s*🔁\s*([A-Za-z0-9,! ]*[A-Za-z0-9!])"#)
-    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions|spent)::\s*([^\]]*?)\s*\]"#)
+    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions|spent|progress)::\s*([^\]]*?)\s*\]"#)
     static let legacyMarker = try! NSRegularExpression(pattern: #"\*\*P([123])\s*·\s*([0-9.]+)(?:\s*[–-]\s*([0-9.]+))?\s*(min|h)\*\*\s*"#)
     static let tagPattern = try! NSRegularExpression(pattern: #"(?<![\w#])#([A-Za-z][\w/-]*)"#)
 
@@ -57,6 +57,7 @@ public enum TaskLineParser {
             switch match[1] {
             case "est": item.legacyEstimate = Int(match[2])
             case "sessions": item.legacySessions = Int(match[2])
+            case "progress": item.progress = Int(match[2].replacingOccurrences(of: "%", with: "")).map { min(100, max(0, $0)) }
             default: item.spentMinutes = parseMinutes(match[2])
             }
         }
@@ -83,6 +84,7 @@ public enum TaskLineParser {
         // An old session count that hasn't been migrated yet is kept as time rather than dropped.
         let spent = t.spentMinutes ?? t.legacySessions.map { $0 * minutesPerSession }
         if let m = spent, m > 0 { parts.append("[spent:: \(formatMinutes(m))]") }
+        if let p = t.progress { parts.append("[progress:: \(p)]") }
         if !t.priorityFromLegacy, let p = t.priority.emoji { parts.append(p) }
         if let r = t.recurrence { parts.append("🔁 \(r)") }
         if let d = t.created { parts.append("➕ \(d)") }
