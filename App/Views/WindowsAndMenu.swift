@@ -65,6 +65,13 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @EnvironmentObject var model: AppModel
 
+    /// "0.3 s (95% within 0.5 s, last 12)" or "No changes from outside yet".
+    private var syncSummary: String {
+        let l = model.syncLatency
+        guard let last = l.last, let p95 = l.p95 else { return "No changes from outside yet" }
+        return String(format: "%.1f s (95%% within %.1f s, last %d)", last, p95, l.samples.count)
+    }
+
     var body: some View {
         TabView {
             general.tabItem { Label("General", systemImage: "gearshape") }
@@ -82,6 +89,8 @@ struct SettingsView: View {
                 Toggle("Keep raw session logs in the vault (Hermes can read them)", isOn: $settings.logsInVault)
                 Text("Off: raw logs stay in ~/Library/Application Support/PastelFocus/Logs and Hermes sees summaries only.")
                     .font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Live updates", value: syncSummary)
+                    .help("How long a change to a task file (from Obsidian, Hermes or another app) takes to show here. Target: under \(Int(SyncLatency.target)) s.")
             }
             Section("Hermes") {
                 Toggle("Let Hermes start focus sessions directly", isOn: $settings.allowHermesStart)

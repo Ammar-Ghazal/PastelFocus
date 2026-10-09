@@ -121,6 +121,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Performance notes
 
+- **Live updates from the vault:** an FSEvents watcher on the daily folder and the PastelFocus folder. Only task files count (immediate `.md` files of the daily folder, Backlog, Inbox, Tags.md); wiki pages, the app's logs and reports, and hidden temp files are ignored. After the last change it waits 0.12 s for the write to settle (never more than 0.6 s after the first), then compares sizes and modification times with what the app last read or wrote: a match is the app's own write echoing back and is skipped, so the app and Hermes can't wake each other in a loop. Concurrent writes are handled by `SafeFile` (re-read, compare, atomic rename, retry). Target: a change shows within 1 s (95%); measured here, events arrive in ~5 ms and a refresh of 50 tasks takes ~15 ms, so ~0.15 s end to end. Settings → General → Vault shows the measured latency.
 - Per-second timer values live in `TickState`, observed only by the Focus panel and menu-bar label, so the Today list doesn't redraw every second.
 - Looping animations (garden fireflies, play-button glow) are Core Animation layers that run in the render server; the dial ring eases only when you change it, not on every tick.
 - Log files are cached per file and re-parsed only when their size or date changes; generated files are written only when their content changes.

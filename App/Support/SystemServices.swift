@@ -7,15 +7,18 @@ import UserNotifications
 /// FSEvents watcher on several folders; calls back on the main queue, coalesced to `latency`.
 final class FileWatcher {
     private var stream: FSEventStreamRef?
-    private let callback: () -> Void
+    private let callback: ([String]) -> Void
 
-    init(paths: [String], latency: TimeInterval = 0.3, callback: @escaping () -> Void) {
+    /// Calls back on the main queue with the paths that changed. `latency` is how long FSEvents
+    /// gathers events before delivering them; NoDefer delivers the first one straight away.
+    init(paths: [String], latency: TimeInterval = 0.1, callback: @escaping ([String]) -> Void) {
         self.callback = callback
         var ctx = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
-        let flags = UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
-        stream = FSEventStreamCreate(nil, { _, info, _, _, _, _ in
+        let flags = UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
+        stream = FSEventStreamCreate(nil, { _, info, count, paths, _, _ in
             guard let info else { return }
-            Unmanaged<FileWatcher>.fromOpaque(info).takeUnretainedValue().callback()
+            let list = (Unmanaged<CFArray>.fromOpaque(paths).takeUnretainedValue() as? [String]) ?? []
+            Unmanaged<FileWatcher>.fromOpaque(info).takeUnretainedValue().callback(Array(list.prefix(count)))
         }, &ctx, paths as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), latency, flags)
         if let stream {
             FSEventStreamSetDispatchQueue(stream, .main)
