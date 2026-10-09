@@ -2,10 +2,11 @@ import Foundation
 
 /// How the Today list is ordered (Settings → General).
 public enum TaskSort: String, CaseIterable, Sendable {
-    case priority, title, tag
+    case time, priority, title, tag
 
     public var label: String {
         switch self {
+        case .time: return "Time of day"
         case .priority: return "Priority"
         case .title: return "Task name (A–Z)"
         case .tag: return "Tag (A–Z)"
@@ -19,6 +20,14 @@ public enum TaskSort: String, CaseIterable, Sendable {
             let (x, y) = (a.element, b.element)
             if Self.group(x) != Self.group(y) { return Self.group(x) < Self.group(y) }
             switch self {
+            case .time:
+                // Timed tasks in time order, then the rest.
+                switch (x.startTime, y.startTime) {
+                case let (p?, q?) where p != q: return p < q
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default: break
+                }
             case .priority:
                 break
             case .title:

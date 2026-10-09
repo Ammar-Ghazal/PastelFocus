@@ -60,7 +60,14 @@ The words of the Obsidian Tasks plugin, of which the app understands:
 | `every month`, `every 2 months` | the same day of the month |
 | any of the above + ` when done` | counted from the day it's done, not the day it was planned |
 
-A repeating task is **one line**: its current occurrence, with `⏳` on the day it's for. The app never lists a routine's future days. Don't write a copy for each day. A rule the app can't read is kept as text, and the task still counts as repeating.
+A repeating task is **one line**: its current occurrence, with `⏳` on the day it's for. The app never lists a routine's future days. Don't write a copy for each day.
+
+When an occurrence is completed (ticked, `complete`, or progress 100), the app adds the next one, as the Tasks plugin does:
+- **Copied:** the same text, time, length, priority and rule.
+- **Day:** the rule's next day after the completed one. For a `when done` rule it counts from today instead, and an occurrence that would already be overdue moves to today.
+- **Start and due dates:** move by the same number of days.
+- **Where it goes:** today's note, or `Backlog.md` with `⏳` for a later day. It gets a new `🆔`.
+- **Duplicates:** nothing is added if that occurrence already exists. A rule the app can't read is kept as text, and the task still counts as repeating.
 
 ## Changing tasks: the Inbox
 
@@ -71,12 +78,16 @@ Agents change existing tasks only through `PastelFocus/Inbox.md`. Append one unc
 - [ ] reschedule 🆔 zzwi ⏳ 2026-10-10
 - [ ] priority 🆔 zzwi urgent|high|medium|low|none
 - [ ] progress 🆔 zzwi 60
+- [ ] schedule 🆔 zzwi 07:00 - 07:45
+- [ ] repeat 🆔 zzwi every 2 weeks on Monday, Friday
 - [ ] complete 🆔 zzwi · reopen 🆔 zzwi · cancel 🆔 zzwi · later 🆔 zzwi
 - [ ] suggest-focus 🆔 zzwi 40m · start-focus 🆔 zzwi 25m · link-session s1a2b3c4 🆔 zzwi
 ```
 
 - **`create`** takes a task line without the checkbox and without `🆔`, `[spent::]` or `✅`; the app adds those. It puts the task in today's note when it's scheduled for today or has no date, and in `Backlog.md` otherwise.
 - **Results:** the app ticks each command with `→ created 🆔 …`, `→ applied HH:MM by …` or `→ error: …`. An unticked command is still queued, for example because the app isn't running. Never resend it as a new command.
+- **`schedule`** sets the time: `07:00`, `07:00 - 07:45`, a length alone such as `45m`, or `none` to clear it.
+- **`repeat`** sets the rule, or clears it with `never`. Rules are stored in canonical words, and a rule the app can't read is refused.
 - **Removed:** `estimate` (version 1) is no longer accepted.
 
 ## Rules for writers

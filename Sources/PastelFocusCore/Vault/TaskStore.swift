@@ -173,10 +173,13 @@ public final class TaskStore {
         return result
     }
 
-    public func setStatus(_ id: String, _ status: TaskStatus, actor: Actor, reason: String? = nil) throws {
+    /// Returns the next occurrence when this completes a repeating task (see `scheduleNextOccurrence`).
+    @discardableResult
+    public func setStatus(_ id: String, _ status: TaskStatus, actor: Actor, reason: String? = nil) throws -> TaskItem? {
         let now = clock.now()
         let day = today
-        try mutate(id, actor: actor, reason: reason) { t in
+        let wasDone = find(id)?.status == .done
+        let t = try mutate(id, actor: actor, reason: reason) { t in
             guard t.status != status else { return [] }
             let old = t.status
             t.status = status
@@ -189,6 +192,7 @@ public final class TaskStore {
             }
             return [TaskEvent(at: now, taskId: id, type: type, field: "status", old: old.rawValue, new: status.rawValue, actor: actor)]
         }
+        return status == .done && !wasDone ? try scheduleNextOccurrence(of: t, actor: actor) : nil
     }
 
     public func reschedule(_ id: String, to day: String, actor: Actor, reason: String? = nil) throws {
@@ -214,10 +218,12 @@ public final class TaskStore {
 
     /// Records how much of the whole task is done (0–100). Reaching 100 completes the task, so it
     /// shows as done everywhere: Today, Now.md, the note and Hermes.
-    public func setProgress(_ id: String, _ percent: Int, actor: Actor, reason: String? = nil) throws {
+    @discardableResult
+    public func setProgress(_ id: String, _ percent: Int, actor: Actor, reason: String? = nil) throws -> TaskItem? {
         let p = min(100, max(0, percent))
         let now = clock.now(), day = today
-        try mutate(id, actor: actor, reason: reason) { t in
+        let wasDone = find(id)?.status == .done
+        let t = try mutate(id, actor: actor, reason: reason) { t in
             var out: [TaskEvent] = []
             if t.progress != p {
                 out.append(TaskEvent(at: now, taskId: id, type: .progressChanged, field: "progress", old: t.progress.map(String.init), new: "\(p)", actor: actor))
@@ -230,6 +236,53 @@ public final class TaskStore {
             }
             return out
         }
+        return t.status == .done && !wasDone ? try scheduleNextOccurrence(of: t, actor: actor) : nil
+    }
+
+    /// Sets or clears the time of day (`HH:MM`) and planned length in minutes.
+    public func setTime(_ id: String, start: String?, minutes: Int?, actor: Actor, reason: String? = nil) throws {
+        let now = clock.now()
+        try mutate(id, actor: actor, reason: reason) { t in
+            guard t.startTime != start || t.durationMinutes != minutes else { return [] }
+            let old = t.timeLabel
+            t.startTime = start
+            t.durationMinutes = minutes
+            return [TaskEvent(at: now, taskId: id, type: .edited, field: "time", old: old, new: t.timeLabel, actor: actor)]
+        }
+    }
+
+    /// Sets or clears the repeat rule (written in its canonical words when the app can read it).
+    public func setRecurrence(_ id: String, _ rule: String?, actor: Actor, reason: String? = nil) throws {
+        let now = clock.now()
+        let text = rule.map { Recurrence($0)?.text ?? $0 }
+        try mutate(id, actor: actor, reason: reason) { t in
+            guard t.recurrence != text else { return [] }
+            let old = t.recurrence
+            t.recurrence = text
+            return [TaskEvent(at: now, taskId: id, type: .edited, field: "recurrence", old: old, new: text, actor: actor)]
+        }
+    }
+
+    /// When a repeating task is done, adds its next occurrence, as the Tasks plugin does: same
+    /// text, time, length, priority and rule, planned for the rule's next day after this one (after
+    /// today for a `when done` rule). An occurrence that would already be overdue moves to today,
+    /// and start and due dates move by the same number of days. Nothing is added when the task
+    /// doesn't repeat, the rule can't be read, or that occurrence already exists.
+    @discardableResult
+    public func scheduleNextOccurrence(of done: TaskItem, actor: Actor) throws -> TaskItem? {
+        guard let rule = done.rule else { return nil }
+        let base = rule.whenDone ? today : (effectiveDay(done) ?? today)
+        guard var next = rule.next(after: base, calendar: calendar) else { return nil }
+        if next < today { next = today }
+        let shift = calendar.daysBetween(base, next)
+        if scan().tasks.contains(where: { $0.status.isOpen && $0.description == done.description && $0.recurrence == done.recurrence && effectiveDay($0) == next }) {
+            return nil
+        }
+        let t = TaskItem(description: done.description, priority: done.priority, priorityFromLegacy: done.priorityFromLegacy,
+                         scheduled: next, due: done.due.map { calendar.addDays(shift, to: $0) },
+                         start: done.start.map { calendar.addDays(shift, to: $0) }, recurrence: done.recurrence,
+                         startTime: done.startTime, durationMinutes: done.durationMinutes)
+        return try create(t, actor: .app, reason: "repeats \(rule.text)")
     }
 
     /// Adds a tag such as `later` (no-op if present).
@@ -302,6 +355,8 @@ public final class TaskStore {
             if edited.due != original.due { t.due = edited.due }
             if edited.start != original.start { t.start = edited.start }
             if edited.recurrence != original.recurrence { t.recurrence = edited.recurrence }
+            if edited.startTime != original.startTime { t.startTime = edited.startTime }
+            if edited.durationMinutes != original.durationMinutes { t.durationMinutes = edited.durationMinutes }
             if edited.notes != original.notes { t.notes = edited.notes.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
 
             lines[idx] = TaskLineParser.serialize(t)
@@ -317,7 +372,10 @@ public final class TaskStore {
             newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "notes", old: before.notes.joined(separator: "\n"),
                                        new: after.notes.joined(separator: "\n"), actor: actor))
         }
+        if before.timeLabel != after.timeLabel { newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "time", old: before.timeLabel, new: after.timeLabel, actor: actor)) }
+        if before.recurrence != after.recurrence { newEvents.append(TaskEvent(at: now, taskId: id, type: .edited, field: "recurrence", old: before.recurrence, new: after.recurrence, actor: actor)) }
         for e in newEvents { try events.append(e, at: now) }
+        if after.status == .done, before.status != .done { try scheduleNextOccurrence(of: after, actor: actor) }
         return after
     }
 

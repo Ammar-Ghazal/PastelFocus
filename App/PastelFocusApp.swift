@@ -64,10 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("\(name).png"))
             }
         }
-        if var demo = TaskLineParser.parse("- [/] Practice a mock interview — 45 min with a timer #career #learning [spent:: 1h 10m] 🔺 📅 2026-10-10 🆔 demo",
+        if var demo = TaskLineParser.parse("- [/] 09:00 - 10:30 Practice a mock interview — 45 min with a timer #career #learning [spent:: 1h 10m] 🔺 🔁 every 2 weeks on Monday, Thursday 📅 2026-10-10 🆔 demo",
                                            file: "Daily Plans/2026-10-08.md") {
             demo.notes = ["Use the STAR outline", "Record it"]
-            saveWindow("task-editor", size: CGSize(width: 460, height: 900), TaskEditorView(original: demo, close: {}))
+            saveWindow("task-editor", size: CGSize(width: 460, height: 1060), TaskEditorView(original: demo, close: {}))
         }
         // One dark and one light combo per theme, plus the shared detail views in the default theme.
         for def_ in ThemeCatalog.all {

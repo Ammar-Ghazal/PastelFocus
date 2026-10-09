@@ -89,7 +89,7 @@ final class AppSettings: ObservableObject {
         showProgress = d.bool(forKey: "showProgress")
         savedReasons = d.stringArray(forKey: "savedReasons") ?? []
         stopwatchMode = d.bool(forKey: "stopwatchMode")
-        taskSort = d.string(forKey: "taskSort").flatMap(TaskSort.init(rawValue:)) ?? .priority
+        taskSort = d.string(forKey: "taskSort").flatMap(TaskSort.init(rawValue:)) ?? .time
         timerStyle = d.string(forKey: "timerStyle").flatMap(TimerStyle.init(rawValue:)) ?? .ring
     }
 
