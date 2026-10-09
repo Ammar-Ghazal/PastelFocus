@@ -100,22 +100,18 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 ## Themes
 
-12 themes × 21 colour combos (252 palettes), chosen in **Settings → Appearance** (or the menu bar's Theme menu). Each theme is a scene with its own art, ambient motion and title typeface:
+Six themes, each with 7–9 colour combos (dark and light), chosen in **Settings → Appearance** (or the menu bar's Theme menu). Each theme is a scene with its own art, ambient motion and title typeface:
 
 | Theme | Scene and motion | Type |
 | --- | --- | --- |
-| Pastel Retro | Dark glass, pixel sparkles (the original look) | SF |
-| Deep Space | Twinkling stars, planets orbiting a glowing sun | SF |
-| Enchanted Forest | Misty pines, drifting fireflies | Serif |
-| Ocean Depths | Light rays, rising bubbles | Rounded |
-| Synthwave | Striped neon sun, horizon grid | SF |
-| Zen Paper | Paper grain, ink ensō, no motion | Serif |
-| Cozy Autumn | Warm glow, falling leaves | Serif |
-| Aurora | Swaying aurora ribbons over a ridge | SF |
-| Desert Dusk | Dunes, low sun, blowing sand | SF |
-| Sakura Garden | Blossom branch, drifting petals | Rounded |
-| Retro Terminal | CRT scanlines, blinking cursor | Mono |
-| Winter Snowfall | Snowfall over hills and pines | Rounded |
+| Space | Black sky, blinking stars, a sun with orbiting planets, a ringed giant; a rocket and a UFO pass now and then, plus the odd shooting star | SF |
+| Cherry Blossom | A blossoming cherry tree over soft hills; petals and leaves fall | Rounded |
+| Rainforest | Layered jungle and vines; the light (day, dusk or night) is picked at random each launch, and rain comes in random bursts a few minutes apart (fireflies at night) | Serif |
+| Snow | Arctic peaks and a snowfield with a polar bear, penguins, a snow fox and a snowy owl; snow falls | Rounded |
+| Ember | A campsite: pines, tents, a flickering campfire, rising embers and fireflies | Serif |
+| Cyberpunk | A hazy future city of lit towers and neon signs; rain, flying cars and a flickering sign | Mono |
+
+Themes from before the six carry over: Deep Space → Space; Sakura, Pastel Retro and Zen Paper → Cherry Blossom (the original Midnight and Morning Blossom palettes live there, unchanged, and are still the default); Enchanted Forest and Ocean Depths → Rainforest; Winter and Aurora → Snow; Cozy Autumn and Desert Dusk → Ember; Synthwave and Retro Terminal → Cyberpunk. A palette keeps its name when the new theme has it (Supernova, Saturn Gold, …), otherwise the theme's first.
 
 **How palettes are made (`Sources/PastelFocusCore/Theme`).** Each combo is a one-line spec — mode, background hue, accent hue, vibrance, tag hues. `PaletteBuilder` derives all 25 tokens in OKLCH (perceptual lightness/chroma, gamut-mapped to sRGB), then enforces WCAG contrast: primary text ≥ 7:1, secondary ≥ 4.5:1, tags ≥ 4.5:1, and text on accent fills ≥ 4.5:1 (dark or light text, whichever reads better). `ThemeTests` checks every palette for these, for in-gamut colours, unique IDs, and tag colours that stay distinguishable. The original Midnight Blossom palette is kept exactly.
 

@@ -26,6 +26,14 @@ enum Sprite {
     static let bridge = ["........", "........", ".RRRRRR.", "R.R..R.R", "R......R", "........", "........", "........"]
     static let catMascot = ["P......P", "PP....PP", "PLLLLLLP", "LKLLLLKL", "LLLppLLL", ".LLLLLL.", "..L..L..", "........"]
 
+    // Scene creatures and craft.
+    static let rocket = ["...W...", "..WWW..", "..WCW..", "..WWW..", ".RWWWR.", "R.WWW.R", "..YOY..", "...Y..."]
+    static let ufo = ["...CC...", "..CCCC..", "SSSSSSSS", ".sYsYsY.", "..ssss.."]
+    static let polarBear = [".WW.......WW.", "WWWWWWWWWWWW.", "WWWWWWWWWWKWW", "WWWWWWWWWWWWK", "WWWWWWWWWWW..", ".WW.WW..WW.WW"]
+    static let penguin = ["..KK..", ".KWKK.", ".KWWKY", "KKWWKK", "KKWWKK", ".KWWK.", ".Y..Y."]
+    static let snowFox = ["W.......W.", "WW.....WW.", ".WWWWWWKWW", ".WWWWWWWWK", "WWWWWWWW..", "W.W..W.W.."]
+    static let snowOwl = [".W..W.", "WWWWWW", "WYKYKW", "WWyyWW", "WSWWSW", ".WWWW.", "..yy.."]
+
     static let mushroom = ["........", "..pPPp..", ".pPWPPp.", "pPPPPWPp", "...WW...", "...WW...", "..WWWW..", "........"]
     static let cactus = ["...M....", "...M..M.", "M..M..M.", "M..MMMM.", "MMMM....", "...M....", "..tTTt..", "..tttt.."]
     static let sunflower = ["..Y.Y...", ".YYyYY..", "YYyByYY.", ".YYyYY..", "..YMY...", "...M.M..", "..MM....", "...M...."]

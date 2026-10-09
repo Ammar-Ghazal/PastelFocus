@@ -74,12 +74,16 @@ final class AppSettings: ObservableObject {
         if let old = d.string(forKey: "themeMode") {
             let fallback = ThemeSelection.default
             d.set(fallback.themeID, forKey: "themeID")
-            d.set(old == "day" ? "pastel-retro/morning-blossom" : fallback.paletteID, forKey: "paletteID")
+            d.set(old == "day" ? "cherry-blossom/morning-blossom" : fallback.paletteID, forKey: "paletteID")
             if old == "system" { d.set(true, forKey: "matchSystemAppearance") }
             d.removeObject(forKey: "themeMode")
         }
-        themeSelection = ThemeSelection(themeID: d.string(forKey: "themeID") ?? ThemeSelection.default.themeID,
-                                        paletteID: d.string(forKey: "paletteID") ?? ThemeSelection.default.paletteID)
+        // Themes from before the six carry over to the theme that replaced them (and are saved so).
+        let stored = ThemeSelection(themeID: d.string(forKey: "themeID") ?? ThemeSelection.default.themeID,
+                                    paletteID: d.string(forKey: "paletteID") ?? ThemeSelection.default.paletteID)
+        let migrated = ThemeCatalog.migrate(stored)
+        if migrated != stored { d.set(migrated.themeID, forKey: "themeID"); d.set(migrated.paletteID, forKey: "paletteID") }
+        themeSelection = migrated
         matchSystemAppearance = d.bool(forKey: "matchSystemAppearance")
         ambientMotion = d.bool(forKey: "ambientMotion")
         nsdrAudio = d.string(forKey: "nsdrAudio")!
