@@ -72,8 +72,13 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     public var priority: Priority
     /// True when the priority came from a legacy `**P1 · 90 min**` marker.
     public var priorityFromLegacy: Bool
-    public var estimateSessions: Int?
-    public var actualSessions: Int?
+    /// Minutes of focus logged on the task (`[spent:: 1h 25m]`). The app keeps it in step with the
+    /// sessions log.
+    public var spentMinutes: Int?
+    /// Fields from before time tracking: `[est:: N]` and `[sessions:: N]`. Read so they can be
+    /// migrated, never written back.
+    public var legacyEstimate: Int?
+    public var legacySessions: Int?
     public var created: String?
     public var scheduled: String?
     public var due: String?
@@ -92,7 +97,7 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
 
     public init(taskID: String? = nil, status: TaskStatus = .todo, description: String,
                 priority: Priority = .none, priorityFromLegacy: Bool = false,
-                estimateSessions: Int? = nil, actualSessions: Int? = nil,
+                spentMinutes: Int? = nil, legacyEstimate: Int? = nil, legacySessions: Int? = nil,
                 created: String? = nil, scheduled: String? = nil, due: String? = nil,
                 start: String? = nil, completed: String? = nil, recurrence: String? = nil, notes: [String] = [],
                 file: String = "", lineIndex: Int = 0, indent: String = "") {
@@ -101,8 +106,9 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
         self.description = description
         self.priority = priority
         self.priorityFromLegacy = priorityFromLegacy
-        self.estimateSessions = estimateSessions
-        self.actualSessions = actualSessions
+        self.spentMinutes = spentMinutes
+        self.legacyEstimate = legacyEstimate
+        self.legacySessions = legacySessions
         self.created = created
         self.scheduled = scheduled
         self.due = due
@@ -126,6 +132,9 @@ public struct TaskItem: Equatable, Codable, Sendable, Identifiable {
     }
 
     public var isLater: Bool { tags.contains { $0.lowercased() == "later" } }
+
+    /// Still carries `[est:: N]` or `[sessions:: N]`.
+    public var hasLegacyTimeFields: Bool { legacyEstimate != nil || legacySessions != nil }
 
     /// A routine (🔁). Only its current line is listed, never its future days.
     public var isRepeating: Bool { recurrence != nil }

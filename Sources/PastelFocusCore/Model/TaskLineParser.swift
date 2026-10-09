@@ -9,11 +9,12 @@ public enum TaskLineParser {
     static let priorityField = try! NSRegularExpression(pattern: #"\s*(🔺|⏫|🔼|🔽|⏬)️?"#)
     /// The rule runs to the next field or tag, as the Tasks plugin reads it: `🔁 every week on Monday`.
     static let recurrenceField = try! NSRegularExpression(pattern: #"\s*🔁\s*([A-Za-z0-9,! ]*[A-Za-z0-9!])"#)
-    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions)::\s*(\d+)\s*\]"#)
+    static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions|spent)::\s*([^\]]*?)\s*\]"#)
     static let legacyMarker = try! NSRegularExpression(pattern: #"\*\*P([123])\s*·\s*([0-9.]+)(?:\s*[–-]\s*([0-9.]+))?\s*(min|h)\*\*\s*"#)
     static let tagPattern = try! NSRegularExpression(pattern: #"(?<![\w#])#([A-Za-z][\w/-]*)"#)
 
-    /// Minutes in one estimated focus session, used to convert legacy minute estimates.
+    /// Minutes in one classic focus session; used to turn an old `[sessions:: N]` count into time
+    /// when the sessions log has nothing for the task.
     public static let minutesPerSession = 25
 
     public static func isTaskLine(_ line: String) -> Bool {
@@ -53,8 +54,11 @@ public enum TaskLineParser {
         }
         if let r = extract(recurrenceField, from: &text).first { item.recurrence = r[1] }
         for match in extract(inlineField, from: &text) {
-            let value = Int(match[2])
-            if match[1] == "est" { item.estimateSessions = value } else { item.actualSessions = value }
+            switch match[1] {
+            case "est": item.legacyEstimate = Int(match[2])
+            case "sessions": item.legacySessions = Int(match[2])
+            default: item.spentMinutes = parseMinutes(match[2])
+            }
         }
 
         let tns = text as NSString
@@ -67,13 +71,6 @@ public enum TaskLineParser {
                 }
                 item.priorityFromLegacy = true
             }
-            if item.estimateSessions == nil {
-                let low = Double(tns.substring(with: lm.range(at: 2))) ?? 0
-                let high = lm.range(at: 3).location != NSNotFound ? Double(tns.substring(with: lm.range(at: 3))) ?? low : low
-                let unitMinutes = tns.substring(with: lm.range(at: 4)) == "h" ? 60.0 : 1.0
-                let minutes = max(low, high) * unitMinutes
-                item.estimateSessions = max(1, Int((minutes / Double(minutesPerSession)).rounded(.up)))
-            }
         }
 
         item.description = collapseSpaces(text)
@@ -83,8 +80,9 @@ public enum TaskLineParser {
     /// Canonical line: description, inline fields, then Tasks plugin emoji fields (which must come last).
     public static func serialize(_ t: TaskItem) -> String {
         var parts: [String] = [t.description]
-        if let e = t.estimateSessions { parts.append("[est:: \(e)]") }
-        if let s = t.actualSessions { parts.append("[sessions:: \(s)]") }
+        // An old session count that hasn't been migrated yet is kept as time rather than dropped.
+        let spent = t.spentMinutes ?? t.legacySessions.map { $0 * minutesPerSession }
+        if let m = spent, m > 0 { parts.append("[spent:: \(formatMinutes(m))]") }
         if !t.priorityFromLegacy, let p = t.priority.emoji { parts.append(p) }
         if let r = t.recurrence { parts.append("🔁 \(r)") }
         if let d = t.created { parts.append("➕ \(d)") }
@@ -98,6 +96,22 @@ public enum TaskLineParser {
     }
 
     // MARK: Helpers
+
+    /// "25m", "2h", "1h 25m": the `[spent::]` value.
+    public static func formatMinutes(_ m: Int) -> String {
+        m < 60 ? "\(m)m" : m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
+    }
+
+    /// Reads "1h 25m", "1h25m", "2h", "85m", "85 min" or a bare number of minutes.
+    public static func parseMinutes(_ s: String) -> Int? {
+        let t = s.lowercased().replacingOccurrences(of: " ", with: "")
+        if let n = Int(t) { return n }
+        guard let re = try? NSRegularExpression(pattern: #"^(?:(\d+)h)?(?:(\d+)m(?:in)?)?$"#),
+              let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)), !t.isEmpty else { return nil }
+        let ns = t as NSString
+        func group(_ i: Int) -> Int { m.range(at: i).location == NSNotFound ? 0 : Int(ns.substring(with: m.range(at: i))) ?? 0 }
+        return group(1) * 60 + group(2)
+    }
 
     public static func tags(in text: String) -> [String] {
         let ns = text as NSString

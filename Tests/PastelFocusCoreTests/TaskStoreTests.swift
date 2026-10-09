@@ -15,7 +15,7 @@ final class TaskStoreTests: XCTestCase {
 
         ## Today's task list
 
-        - [ ] Finalize resume #career ⏫ [est:: 3] 🆔 r7q2
+        - [ ] Finalize resume #career [spent:: 50m] ⏫ 🆔 r7q2
             - Use the SWE template
         - [ ] Old legacy task without id
         - [x] Done earlier 🆔 d0n3 ✅ 2026-10-06
@@ -96,9 +96,9 @@ final class TaskStoreTests: XCTestCase {
     }
 
     func testCreateGoesToTodayOrBacklog() throws {
-        let a = try store.create(TaskItem(description: "Mock interview #learning", priority: .high, estimateSessions: 2), actor: .hermes)
+        let a = try store.create(TaskItem(description: "Mock interview #learning", priority: .high, legacyEstimate: 2), actor: .hermes)
         XCTAssertEqual(a.file, config.relativePath(config.dailyNote("2026-10-07")))
-        XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("- [ ] Mock interview #learning [est:: 2] ⏫ ➕ 2026-10-07 🆔 \(a.taskID!)"))
+        XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("- [ ] Mock interview #learning ⏫ ➕ 2026-10-07 🆔 \(a.taskID!)"))
         let b = try store.create(TaskItem(description: "Later thing", scheduled: "2026-10-12"), actor: .you)
         XCTAssertEqual(b.file, config.relativePath(config.backlog))
         XCTAssertEqual(store.events.readAll().filter { $0.type == .created }.count, 2)
@@ -116,7 +116,7 @@ final class TaskStoreTests: XCTestCase {
         let url = config.dailyNote("2026-10-06")
         let before = SafeFile.readLines(url)
         let removed = try store.delete("r7q2", actor: .you)
-        XCTAssertEqual(removed.lines, ["- [ ] Finalize resume #career ⏫ [est:: 3] 🆔 r7q2", "    - Use the SWE template"])
+        XCTAssertEqual(removed.lines, ["- [ ] Finalize resume #career [spent:: 50m] ⏫ 🆔 r7q2", "    - Use the SWE template"])
         XCTAssertNil(store.find("r7q2"))
         let after = SafeFile.readLines(url)
         XCTAssertEqual(after.count, before.count - 2)
@@ -132,19 +132,18 @@ final class TaskStoreTests: XCTestCase {
 
     func testEditorSaveWritesOnlyChangedFields() throws {
         let original = try XCTUnwrap(store.find("r7q2"))
-        // Hermes logs a session while the editor is open.
-        try store.setActualSessions("r7q2", 2)
+        // A session is logged while the editor is open.
+        try store.setSpent("r7q2", minutes: 75)
         var edited = original
         edited.description = "Finalize resume — SWE version #career #writing"
         edited.priority = .urgent
         edited.due = "2026-10-10"
         edited.notes = ["Use the SWE template", "  Ask Sam to review  ", ""]
         let saved = try store.apply("r7q2", from: original, to: edited, actor: .you)
-        XCTAssertEqual(saved.actualSessions, 2, "the concurrent change survives")
-        XCTAssertEqual(saved.estimateSessions, 3)
+        XCTAssertEqual(saved.spentMinutes, 75, "the concurrent change survives")
         let lines = SafeFile.readLines(config.dailyNote("2026-10-06"))
         let i = try XCTUnwrap(lines.firstIndex { $0.contains("🆔 r7q2") })
-        XCTAssertEqual(lines[i], "- [ ] Finalize resume — SWE version #career #writing [est:: 3] [sessions:: 2] 🔺 📅 2026-10-10 🆔 r7q2")
+        XCTAssertEqual(lines[i], "- [ ] Finalize resume — SWE version #career #writing [spent:: 1h 15m] 🔺 📅 2026-10-10 🆔 r7q2")
         XCTAssertEqual(Array(lines[(i + 1)...(i + 2)]), ["    - Use the SWE template", "    - Ask Sam to review"])
         XCTAssertEqual(lines[i + 3], "- [ ] Old legacy task without id")
         let types = store.events.readAll().filter { $0.taskId == "r7q2" && $0.actor == .you }.map { $0.field ?? "" }
@@ -185,7 +184,7 @@ final class TaskStoreTests: XCTestCase {
         var edited = original
         edited.description = "Old plan, renamed"
         try store.apply("leg1", from: original, to: edited, actor: .you)
-        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-05")).last, "- [ ] Old plan, renamed [est:: 2] 🔼 🆔 leg1")
+        XCTAssertEqual(SafeFile.readLines(config.dailyNote("2026-10-05")).last, "- [ ] Old plan, renamed 🔼 🆔 leg1")
     }
 
     func testDiffDetectsExternalEdits() {

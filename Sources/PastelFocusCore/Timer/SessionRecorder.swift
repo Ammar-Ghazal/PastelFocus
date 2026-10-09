@@ -21,10 +21,16 @@ public final class SessionRecorder {
         let day = calendar.day(s.startedAt)
         try SafeFile.appendToSection("## Focus log", line: Self.focusLogLine(s, calendar: calendar),
                                      in: config.dailyNote(day), fileHeader: DailyNote.header(day: day, calendar: calendar))
-        if let id = s.taskId, s.outcome == .completed, store.find(id) != nil {
-            let n = log.readAll().filter { $0.kind == .focus && $0.taskId == id && $0.outcome == .completed }.count
-            try store.setActualSessions(id, n)
+        if let id = s.taskId, store.find(id) != nil {
+            try store.setSpent(id, minutes: Self.spentMinutes(log.readAll())[id] ?? 0)
         }
+    }
+
+    /// Minutes of focus logged per task: every focus session counts, finished or not.
+    public static func spentMinutes(_ sessions: [SessionRecord]) -> [String: Int] {
+        var seconds: [String: Int] = [:]
+        for s in sessions where s.kind == .focus { if let id = s.taskId { seconds[id, default: 0] += s.focusedS } }
+        return seconds.mapValues { Int((Double($0) / 60).rounded()) }
     }
 
     /// `- 09:02–09:27 · 🆔 k3m9 · LeetCode · 25/25 min · completed · pauses 0`

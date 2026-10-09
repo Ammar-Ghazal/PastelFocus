@@ -12,7 +12,6 @@ public enum InboxCommand: Equatable {
     case create(TaskItem)
     case reschedule(id: String, day: String)
     case priority(id: String, Priority)
-    case estimate(id: String, sessions: Int)
     case complete(id: String)
     case reopen(id: String)
     case cancel(id: String)
@@ -39,7 +38,7 @@ public final class InboxProcessor {
     public static let header = [
         "# PastelFocus Inbox", "",
         "Hermes (or you) can add one command per line as `- [ ] <command>`. PastelFocus applies it within a second and ticks it with the result.", "",
-        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `estimate 🆔 id N` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
+        "Commands: `create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete 🆔 id` · `reopen 🆔 id` · `cancel 🆔 id` · `later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` · `link-session <session id> 🆔 id`. Add ` — reason: …` or ` — why: …` to explain.", "",
         "## Commands", "",
     ]
 
@@ -86,9 +85,7 @@ public final class InboxProcessor {
             else { throw InboxError("missing priority (urgent, high, medium, low or none)") }
             cmd = .priority(id: try needID(), p)
         case "estimate":
-            let stripped = rest.replacingOccurrences(of: #"🆔\s*[A-Za-z0-9_-]+"#, with: "", options: .regularExpression)
-            guard let n = Self.match(#"(\d+)"#, in: stripped).flatMap(Int.init) else { throw InboxError("missing number of sessions") }
-            cmd = .estimate(id: try needID(), sessions: n)
+            throw InboxError("estimates are no longer used; PastelFocus records time spent from focus sessions")
         case "complete", "done": cmd = .complete(id: try needID())
         case "reopen": cmd = .reopen(id: try needID())
         case "cancel": cmd = .cancel(id: try needID())
@@ -148,7 +145,6 @@ public final class InboxProcessor {
                 return "created 🆔 \(made.taskID!) \(time) by \(who)"
             case .reschedule(let id, let day): try store.reschedule(id, to: day, actor: p.actor, reason: p.reason)
             case .priority(let id, let pr): try store.setPriority(id, pr, actor: p.actor)
-            case .estimate(let id, let n): try store.setEstimate(id, sessions: n, actor: p.actor)
             case .complete(let id): try store.setStatus(id, .done, actor: p.actor, reason: p.reason)
             case .reopen(let id): try store.setStatus(id, .todo, actor: p.actor, reason: p.reason)
             case .cancel(let id): try store.setStatus(id, .cancelled, actor: p.actor, reason: p.reason)

@@ -117,7 +117,7 @@ public enum Reports {
         lines += open.isEmpty ? ["- none"] : open.map { t in
             var bits = ["- \(t.title)", "🆔 \(t.taskID ?? "?")"]
             if t.priority != .none { bits.append(t.priority.label.lowercased()) }
-            if let e = t.estimateSessions { bits.append("\(t.actualSessions ?? 0)/\(e) sessions") }
+            if let m = t.spentMinutes, m > 0 { bits.append("\(GoodDay.label(m)) spent") }
             return bits.joined(separator: " · ")
         }
         return lines.joined(separator: "\n") + "\n"

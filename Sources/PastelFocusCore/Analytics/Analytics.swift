@@ -26,7 +26,6 @@ public struct InsightThresholds: Sendable {
     /// Suggest shorter sessions when the median focus span is this far below the preset.
     public var shorterSessionGap = 0.15
     public var minFocusSpanSessions = 15
-    public var minEstimateTasks = 8
     public var minNSDR = 6
     public var postponeCount = 3
     /// z for an 80% interval.
@@ -92,7 +91,6 @@ public struct AnalyticsEngine {
         out += fatigue(recent, now: now)
         out += weekdays(long, now: now)
         out += pausePosition(recent, now: now)
-        out += estimates(input, sessions: long, now: now)
         out += postponed(input, now: now)
         out += categoryTimeOfDay(long, now: now)
         out += nsdrEffect(input.sessions.filter { now.timeIntervalSince($0.startedAt) <= 90 * 86_400 }, now: now)
@@ -211,26 +209,6 @@ public struct AnalyticsEngine {
         return [Insight(kind: "pause_position", scope: "band:\(lo)-\(hi)", title: "You tend to pause \(lo)–\(hi)% of the way into a session",
                         evidence: "\(top.element) of \(total) pauses (\(pct(Double(top.element) / Double(total)))) in \(withPauses.count) sessions came \(lo)–\(hi)% of the way through.",
                         value: Double(top.element) / Double(total), baseline: 0.2, sampleN: withPauses.count, days: distinctDays(withPauses), windowDays: 28, computedAt: now)]
-    }
-
-    func estimates(_ input: AnalyticsInput, sessions: [SessionRecord], now: Date) -> [Insight] {
-        var done: [String: Int] = [:]
-        for x in sessions where x.outcome == .completed { if let id = x.taskId { done[id, default: 0] += 1 } }
-        var byCategory: [String: [Double]] = [:]
-        for t in input.tasks where t.status == .done {
-            guard let id = t.taskID, let est = t.estimateSessions, est > 0, let actual = done[id] ?? t.actualSessions, actual > 0 else { continue }
-            byCategory[t.category ?? "uncategorized", default: []].append(Double(actual) / Double(est))
-        }
-        return byCategory.sorted { $0.key < $1.key }.compactMap { cat, ratios in
-            guard ratios.count >= thresholds.minEstimateTasks else { return nil }
-            let m = median(ratios)
-            guard m >= thresholds.minRateRatio || m <= 1 / thresholds.minRateRatio else { return nil }
-            let under = m > 1
-            return Insight(kind: "estimate", scope: "category:\(cat)",
-                           title: under ? "\(cat.capitalized) tasks take longer than estimated" : "\(cat.capitalized) tasks finish faster than estimated",
-                           evidence: "\(cat.capitalized) tasks took \(String(format: "%.1f", m))× their estimated sessions (median of \(ratios.count) finished tasks).",
-                           value: m, baseline: 1, sampleN: ratios.count, days: 0, windowDays: 90, computedAt: now)
-        }
     }
 
     func postponed(_ input: AnalyticsInput, now: Date) -> [Insight] {

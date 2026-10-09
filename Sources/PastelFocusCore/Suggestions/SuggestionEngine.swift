@@ -11,7 +11,6 @@ public enum SuggestionMoment {
 public enum SuggestionAction: Equatable, Sendable {
     case useShorterSessions(minutes: Int)
     case takeBreak(kind: SessionKind, minutes: Int)
-    case raiseEstimate(taskID: String, sessions: Int)
     case splitOrDrop(taskID: String)
 }
 
@@ -75,13 +74,6 @@ public final class SuggestionEngine {
             if let p = insights.first(where: { $0.kind == "postponed" && $0.scope == "task:\(id)" }) {
                 return Suggestion(id: Self.newID(), kind: "split_or_drop", title: "Split \"\(task.title)\" into a smaller first step, or drop it?",
                                   why: p.evidence, action: .splitOrDrop(taskID: id))
-            }
-            if let cat = task.category, let est = task.estimateSessions,
-               let e = insights.first(where: { $0.kind == "estimate" && $0.scope == "category:\(cat)" && $0.value >= 1.5 }) {
-                let sessions = Int((Double(est) * e.value).rounded(.up))
-                guard sessions > est else { return nil }
-                return Suggestion(id: Self.newID(), kind: "raise_estimate", title: "Plan \(sessions) sessions for \"\(task.title)\" instead of \(est)?",
-                                  why: e.evidence, action: .raiseEstimate(taskID: id, sessions: sessions))
             }
             return nil
         }

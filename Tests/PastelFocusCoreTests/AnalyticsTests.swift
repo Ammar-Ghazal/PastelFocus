@@ -68,16 +68,14 @@ final class AnalyticsTests: XCTestCase {
         XCTAssertEqual(ins.title, "Focus drops from your 4th block of the day")
     }
 
-    func testPostponedAndEstimates() throws {
-        let tasks = (0..<8).map { i in TaskItem(taskID: "t\(i)", status: .done, description: "Bug \(i) #coding", estimateSessions: 1) }
+    func testPostponedAndNoEstimateInsights() throws {
+        let tasks = (0..<8).map { i in TaskItem(taskID: "t\(i)", status: .done, description: "Bug \(i) #coding") }
             + [TaskItem(taskID: "late", description: "Write cover letter #career")]
         var s: [SessionRecord] = []
         for i in 0..<8 { s += [session(i, hour: 10, category: "coding", task: "t\(i)"), session(i, hour: 12, category: "coding", task: "t\(i)")] }
         let events = (1...3).map { TaskEvent(at: now.addingTimeInterval(Double(-$0) * 86_400), taskId: "late", type: .rescheduled, actor: .you) }
         let all = engine.insights(AnalyticsInput(sessions: s, events: events, tasks: tasks), now: now)
-        let est = try XCTUnwrap(all.first { $0.kind == "estimate" })
-        XCTAssertEqual(est.value, 2)
-        XCTAssertEqual(est.title, "Coding tasks take longer than estimated")
+        XCTAssertNil(all.first { $0.kind == "estimate" }) // estimates are gone
         XCTAssertEqual(all.first { $0.kind == "postponed" }?.title, "\"Write cover letter\" keeps getting postponed")
     }
 
@@ -103,8 +101,8 @@ final class AnalyticsTests: XCTestCase {
         XCTAssertTrue(empty.contains("**Still learning.** 3 focus sessions logged since 2026-10-30."))
 
         let nowMD = Reports.now(.init(appRunning: true, phase: .running, taskTitle: "Resume", taskID: "r7q2", kind: .focus, remainingS: 600, plannedS: 1500),
-                                today: [TaskItem(taskID: "r7q2", description: "Resume", estimateSessions: 3, actualSessions: 1)], rollup: r, updated: now, calendar: dubai)
+                                today: [TaskItem(taskID: "r7q2", description: "Resume", spentMinutes: 85)], rollup: r, updated: now, calendar: dubai)
         XCTAssertTrue(nowMD.contains("focusing on \"Resume\" (🆔 r7q2) — 10 min left of 25 min"))
-        XCTAssertTrue(nowMD.contains("- Resume · 🆔 r7q2 · 1/3 sessions"))
+        XCTAssertTrue(nowMD.contains("- Resume · 🆔 r7q2 · 1 h 25 min spent"))
     }
 }

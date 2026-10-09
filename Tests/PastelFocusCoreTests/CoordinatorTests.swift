@@ -26,6 +26,26 @@ final class CoordinatorTests: XCTestCase {
     }
 
     /// Regression: rewriting unchanged files woke the app's own file watcher in a loop (~20% CPU).
+    func testOldEstimatesAndSessionCountsBecomeTimeSpentWithABackup() throws {
+        let url = config.dailyNote("2026-10-06")
+        write("- [x] Old work #career [est:: 3] [sessions:: 2] ✅ 2026-10-06 🆔 old1\n- [x] Logged work [sessions:: 1] 🆔 log1\n", to: url)
+        // The log knows about 40 minutes on log1, which wins over its old count of one session.
+        let s = SessionRecord(id: "s1", kind: .focus, taskId: "log1", taskTitle: "Logged work", category: nil, preset: "25/5",
+                              plannedS: 2400, startedAt: clock.now().addingTimeInterval(-86_400), endedAt: clock.now().addingTimeInterval(-84_000),
+                              tz: "Asia/Dubai", focusedS: 2400, outcome: .completed, pauses: [])
+        try c.recorder.log.append(s, at: s.startedAt)
+        c.refresh()
+        XCTAssertEqual(SafeFile.readLines(url).prefix(2), [
+            "- [x] Old work #career [spent:: 50m] ✅ 2026-10-06 🆔 old1",
+            "- [x] Logged work [spent:: 40m] 🆔 log1",
+        ])
+        XCTAssertFalse(read(config.dailyNote("2026-10-07")).contains("[est::"))
+        let backups = try FileManager.default.contentsOfDirectory(atPath: support.appendingPathComponent("Backups").path)
+        XCTAssertEqual(backups.count, 1)
+        let saved = support.appendingPathComponent("Backups/\(backups[0])/\(config.relativePath(url))")
+        XCTAssertTrue(read(saved).contains("[est:: 3] [sessions:: 2]"))
+    }
+
     func testRefreshDoesNotRewriteUnchangedFiles() throws {
         c.refresh()
         let mtime = { (try? FileManager.default.attributesOfItem(atPath: self.config.now.path)[.modificationDate]) as? Date }
@@ -73,7 +93,7 @@ final class CoordinatorTests: XCTestCase {
         clock.advance(900)
         let record = try XCTUnwrap(c2.tick())
         c2.sessionEnded(record)
-        XCTAssertEqual(c2.store.find("r7q2")?.actualSessions, 1)
+        XCTAssertEqual(c2.store.find("r7q2")?.spentMinutes, 25)
         XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("## Focus log"))
     }
 

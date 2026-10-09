@@ -27,18 +27,17 @@ final class SuggestionTests: XCTestCase {
         XCTAssertEqual(s.action, .takeBreak(kind: .longBreak, minutes: 20))
     }
 
-    func testShorterSessionsAndEstimateAndPostponed() throws {
+    func testShorterSessionsAndPostponed() throws {
         let e = SuggestionEngine(calendar: dubai, history: [])
         let span = insight("focus_span", value: 41, baseline: 50)
         XCTAssertEqual(e.evaluate(.sessionStart(plannedMinutes: 50), insights: [span], now: t0, sessionRunning: false)?.action,
                        .useShorterSessions(minutes: 40))
         XCTAssertNil(e.evaluate(.sessionStart(plannedMinutes: 45), insights: [span], now: t0, sessionRunning: false))
 
-        let task = TaskItem(taskID: "t1", description: "API work #coding", estimateSessions: 2)
-        let est = insight("estimate", scope: "category:coding", value: 1.8)
-        XCTAssertEqual(e.evaluate(.planning(task), insights: [est], now: t0, sessionRunning: false)?.action, .raiseEstimate(taskID: "t1", sessions: 4))
+        let task = TaskItem(taskID: "t1", description: "API work #coding")
+        XCTAssertNil(e.evaluate(.planning(task), insights: [], now: t0, sessionRunning: false))
         let post = insight("postponed", scope: "task:t1", value: 3)
-        XCTAssertEqual(e.evaluate(.planning(task), insights: [est, post], now: t0, sessionRunning: false)?.action, .splitOrDrop(taskID: "t1"))
+        XCTAssertEqual(e.evaluate(.planning(task), insights: [post], now: t0, sessionRunning: false)?.action, .splitOrDrop(taskID: "t1"))
     }
 
     func testBudgetLimits() {
@@ -46,8 +45,8 @@ final class SuggestionTests: XCTestCase {
         let s = e.evaluate(.sessionEnd(blocksToday: 3), insights: [fatigue], now: t0, sessionRunning: false)!
         e.record(s, .shown, at: t0)
         // 90-minute gap between any two cards.
-        XCTAssertFalse(e.allowed(kind: "raise_estimate", now: t0.addingTimeInterval(60 * 60)))
-        XCTAssertTrue(e.allowed(kind: "raise_estimate", now: t0.addingTimeInterval(91 * 60)))
+        XCTAssertFalse(e.allowed(kind: "split_or_drop", now: t0.addingTimeInterval(60 * 60)))
+        XCTAssertTrue(e.allowed(kind: "split_or_drop", now: t0.addingTimeInterval(91 * 60)))
         // Same kind at most once every 3 days.
         XCTAssertFalse(e.allowed(kind: "break_nsdr", now: t0.addingTimeInterval(2 * 86_400)))
         XCTAssertTrue(e.allowed(kind: "break_nsdr", now: t0.addingTimeInterval(3 * 86_400 + 60)))

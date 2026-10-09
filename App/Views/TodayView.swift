@@ -71,7 +71,7 @@ struct TodayView: View {
     }
 
     private var addField: some View {
-        TextField("New task — add #tag, ⏫ or [est:: 2] if you like", text: $newText)
+        TextField("New task — add #tag or ⏫ if you like", text: $newText)
             .textFieldStyle(.plain)
             .font(.system(size: 14))
             .foregroundStyle(theme.textPrimary)
@@ -200,7 +200,7 @@ struct TaskRow: View {
                 HStack(spacing: 6) {
                     if task.isRepeating { Image(systemName: "repeat").help("Repeats \(task.recurrence ?? "")") }
                     if let s = task.subtitle { Text(s).lineLimit(1) }
-                    if let e = task.estimateSessions { Text("· \(task.actualSessions ?? 0)/\(e) sessions") }
+                    if let m = task.spentMinutes, m > 0 { Text("· \(GoodDay.label(m))").help("Time spent") }
                 }
                 .font(.system(size: 12)).foregroundStyle(theme.textSecondary)
             }
