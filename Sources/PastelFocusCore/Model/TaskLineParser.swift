@@ -7,6 +7,8 @@ public enum TaskLineParser {
     static let idField = try! NSRegularExpression(pattern: #"\s*🆔\s*([A-Za-z0-9_-]+)"#)
     static let dateField = try! NSRegularExpression(pattern: #"\s*(➕|⏳|📅|🛫|✅|❌)\s*(\d{4}-\d{2}-\d{2})"#)
     static let priorityField = try! NSRegularExpression(pattern: #"\s*(🔺|⏫|🔼|🔽|⏬)️?"#)
+    /// The rule runs to the next field or tag, as the Tasks plugin reads it: `🔁 every week on Monday`.
+    static let recurrenceField = try! NSRegularExpression(pattern: #"\s*🔁\s*([A-Za-z0-9,! ]*[A-Za-z0-9!])"#)
     static let inlineField = try! NSRegularExpression(pattern: #"\s*\[(est|sessions)::\s*(\d+)\s*\]"#)
     static let legacyMarker = try! NSRegularExpression(pattern: #"\*\*P([123])\s*·\s*([0-9.]+)(?:\s*[–-]\s*([0-9.]+))?\s*(min|h)\*\*\s*"#)
     static let tagPattern = try! NSRegularExpression(pattern: #"(?<![\w#])#([A-Za-z][\w/-]*)"#)
@@ -49,6 +51,7 @@ public enum TaskLineParser {
             default: break
             }
         }
+        if let r = extract(recurrenceField, from: &text).first { item.recurrence = r[1] }
         for match in extract(inlineField, from: &text) {
             let value = Int(match[2])
             if match[1] == "est" { item.estimateSessions = value } else { item.actualSessions = value }
@@ -83,6 +86,7 @@ public enum TaskLineParser {
         if let e = t.estimateSessions { parts.append("[est:: \(e)]") }
         if let s = t.actualSessions { parts.append("[sessions:: \(s)]") }
         if !t.priorityFromLegacy, let p = t.priority.emoji { parts.append(p) }
+        if let r = t.recurrence { parts.append("🔁 \(r)") }
         if let d = t.created { parts.append("➕ \(d)") }
         if let d = t.start { parts.append("🛫 \(d)") }
         if let d = t.scheduled { parts.append("⏳ \(d)") }
