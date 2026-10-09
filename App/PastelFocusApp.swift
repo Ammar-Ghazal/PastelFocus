@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("\(name).png"))
             }
         }
-        if var demo = TaskLineParser.parse("- [/] Practice a mock interview — 45 min with a timer #career #learning [est:: 2] [sessions:: 1] 🔺 📅 2026-10-10 🆔 demo",
+        if var demo = TaskLineParser.parse("- [/] Practice a mock interview — 45 min with a timer #career #learning [spent:: 1h 10m] 🔺 📅 2026-10-10 🆔 demo",
                                            file: "Daily Plans/2026-10-08.md") {
             demo.notes = ["Use the STAR outline", "Record it"]
             saveWindow("task-editor", size: CGSize(width: 460, height: 900), TaskEditorView(original: demo, close: {}))

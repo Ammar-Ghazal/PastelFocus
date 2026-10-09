@@ -211,16 +211,6 @@ public final class TaskStore {
         }
     }
 
-    public func setEstimate(_ id: String, sessions: Int, actor: Actor) throws {
-        let now = clock.now()
-        try mutate(id, actor: actor) { t in
-            guard t.estimateSessions != sessions else { return [] }
-            let old = t.estimateSessions.map(String.init)
-            t.estimateSessions = sessions
-            return [TaskEvent(at: now, taskId: id, type: .estimateChanged, field: "est", old: old, new: "\(sessions)", actor: actor)]
-        }
-    }
-
     /// Adds a tag such as `later` (no-op if present).
     public func addTag(_ id: String, _ tag: String, actor: Actor) throws {
         let now = clock.now()
@@ -281,7 +271,6 @@ public final class TaskStore {
                 t.completed = edited.status == .done ? (t.completed ?? day) : nil
             }
             if edited.priority != original.priority { t.priority = edited.priority; t.priorityFromLegacy = false }
-            if edited.estimateSessions != original.estimateSessions { t.estimateSessions = edited.estimateSessions }
             if edited.scheduled != original.scheduled { t.scheduled = edited.scheduled }
             if edited.due != original.due { t.due = edited.due }
             if edited.start != original.start { t.start = edited.start }
@@ -349,12 +338,45 @@ public final class TaskStore {
         line.prefix { $0 == " " || $0 == "\t" }.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
     }
 
-    /// Sets `[sessions:: n]` to the number of completed focus sessions linked to the task.
-    public func setActualSessions(_ id: String, _ n: Int) throws {
+    /// Sets `[spent:: …]` to the minutes of focus logged on the task. Leaves the line alone when
+    /// it already says that.
+    public func setSpent(_ id: String, minutes: Int) throws {
+        guard let t = find(id), t.spentMinutes != minutes || t.hasLegacyTimeFields else { return }
         try mutate(id, actor: .app) { t in
-            t.actualSessions = n
+            t.spentMinutes = minutes
             return []
         }
+    }
+
+    /// One-time move from session counts to time: every line still carrying `[est:: N]` or
+    /// `[sessions:: N]` gets `[spent:: …]` instead. The time is what the sessions log holds for the
+    /// task, or N × 25 min for an old count the log knows nothing about; estimates are dropped.
+    /// Each file is copied to `backupDir` before it changes. Returns how many lines changed.
+    @discardableResult
+    public func migrateLegacyTimeFields(spentByTask: [String: Int], backupDir: URL) throws -> Int {
+        var count = 0
+        for url in taskFiles() {
+            let lines = SafeFile.readLines(url)
+            guard lines.contains(where: { TaskLineParser.parse($0)?.hasLegacyTimeFields == true }) else { continue }
+            let rel = config.relativePath(url)
+            let backup = backupDir.appendingPathComponent(rel)
+            try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if !FileManager.default.fileExists(atPath: backup.path) { try FileManager.default.copyItem(at: url, to: backup) }
+            try SafeFile.edit(url) { lines in
+                for (i, line) in lines.enumerated() {
+                    guard var t = TaskLineParser.parse(line), t.hasLegacyTimeFields else { continue }
+                    let logged = t.taskID.flatMap { spentByTask[$0] } ?? 0
+                    let counted = (t.legacySessions ?? 0) * TaskLineParser.minutesPerSession
+                    let minutes = logged > 0 ? logged : counted
+                    t.spentMinutes = minutes > 0 ? minutes : t.spentMinutes
+                    t.legacyEstimate = nil
+                    t.legacySessions = nil
+                    lines[i] = TaskLineParser.serialize(t)
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     /// Appends a new task. Scheduled today or unscheduled → today's note; otherwise → Backlog with ⏳.
@@ -404,9 +426,6 @@ public final class TaskStore {
             }
             if o.priority != t.priority {
                 out.append(TaskEvent(at: at, taskId: id, type: .priorityChanged, field: "priority", old: "\(o.priority.rawValue)", new: "\(t.priority.rawValue)", actor: actor))
-            }
-            if o.estimateSessions != t.estimateSessions {
-                out.append(TaskEvent(at: at, taskId: id, type: .estimateChanged, field: "est", old: o.estimateSessions.map(String.init), new: t.estimateSessions.map(String.init), actor: actor))
             }
             if o.description != t.description {
                 out.append(TaskEvent(at: at, taskId: id, type: .edited, field: "description", old: o.description, new: t.description, actor: actor))

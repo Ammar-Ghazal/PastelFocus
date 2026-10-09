@@ -3,13 +3,13 @@ import XCTest
 
 final class TaskLineParserTests: XCTestCase {
     func testParsesTasksPluginFields() throws {
-        let line = "- [ ] Finalize resume — one ready-to-send version #career ⏫ [est:: 3] [sessions:: 1] ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2"
+        let line = "- [ ] Finalize resume — one ready-to-send version #career ⏫ [spent:: 1h 25m] ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2"
         let t = try XCTUnwrap(TaskLineParser.parse(line))
         XCTAssertEqual(t.taskID, "r7q2")
         XCTAssertEqual(t.status, .todo)
         XCTAssertEqual(t.priority, .high)
-        XCTAssertEqual(t.estimateSessions, 3)
-        XCTAssertEqual(t.actualSessions, 1)
+        XCTAssertEqual(t.spentMinutes, 85)
+        XCTAssertFalse(t.hasLegacyTimeFields)
         XCTAssertEqual(t.created, "2026-10-05")
         XCTAssertEqual(t.scheduled, "2026-10-07")
         XCTAssertEqual(t.due, "2026-10-10")
@@ -19,11 +19,29 @@ final class TaskLineParserTests: XCTestCase {
     }
 
     func testRoundTripIsStable() throws {
-        let line = "- [x] LeetCode: 2 new + 2 review #learning [est:: 4] [sessions:: 4] 🔼 ➕ 2026-10-07 ✅ 2026-10-07 🆔 k3m9"
+        let line = "- [x] LeetCode: 2 new + 2 review #learning [spent:: 2h] 🔼 ➕ 2026-10-07 ✅ 2026-10-07 🆔 k3m9"
         let t = try XCTUnwrap(TaskLineParser.parse(line))
         XCTAssertEqual(TaskLineParser.serialize(t), line)
         XCTAssertEqual(t.status, .done)
         XCTAssertEqual(t.completed, "2026-10-07")
+    }
+
+    func testSpentAcceptsSeveralSpellings() {
+        for (text, minutes) in [("1h 25m", 85), ("1h25m", 85), ("2h", 120), ("45m", 45), ("45 min", 45), ("45", 45)] {
+            XCTAssertEqual(TaskLineParser.parseMinutes(text), minutes, text)
+        }
+        XCTAssertNil(TaskLineParser.parseMinutes("soon"))
+        XCTAssertEqual([25, 60, 85].map(TaskLineParser.formatMinutes), ["25m", "1h", "1h 25m"])
+    }
+
+    func testOldSessionFieldsAreReadButBecomeTime() throws {
+        let t = try XCTUnwrap(TaskLineParser.parse("- [ ] Resume #career [est:: 3] [sessions:: 2] 🆔 r7q2"))
+        XCTAssertEqual(t.legacyEstimate, 3)
+        XCTAssertEqual(t.legacySessions, 2)
+        XCTAssertTrue(t.hasLegacyTimeFields)
+        XCTAssertEqual(t.title, "Resume")
+        // Written back, the estimate goes and the count is kept as time (2 × 25 min).
+        XCTAssertEqual(TaskLineParser.serialize(t), "- [ ] Resume #career [spent:: 50m] 🆔 r7q2")
     }
 
     func testRecurrenceIsReadAndKept() throws {
@@ -41,7 +59,6 @@ final class TaskLineParserTests: XCTestCase {
         let t = try XCTUnwrap(TaskLineParser.parse(line))
         XCTAssertEqual(t.priority, .high)
         XCTAssertTrue(t.priorityFromLegacy)
-        XCTAssertEqual(t.estimateSessions, 4) // 90 min / 25 rounded up
         XCTAssertEqual(t.title, "Finalize resume")
         // Stamping an ID keeps the legacy marker and does not add a duplicate priority emoji.
         var stamped = t
@@ -49,12 +66,11 @@ final class TaskLineParserTests: XCTestCase {
         let out = TaskLineParser.serialize(stamped)
         XCTAssertTrue(out.hasPrefix("- [ ] **P1 · 90 min** Finalize resume"))
         XCTAssertFalse(out.contains("⏫"))
-        XCTAssertTrue(out.hasSuffix("[est:: 4] 🆔 abcd"))
+        XCTAssertTrue(out.hasSuffix("In progress as of about 13:10.** 🆔 abcd"))
     }
 
     func testLegacyHourRange() throws {
         let t = try XCTUnwrap(TaskLineParser.parse("- [x] **P1 · 1–2 h** LeetCode practice"))
-        XCTAssertEqual(t.estimateSessions, 5) // 120 min / 25 rounded up
         XCTAssertEqual(t.status, .done)
     }
 

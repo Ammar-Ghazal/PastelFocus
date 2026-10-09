@@ -56,7 +56,11 @@ public final class Coordinator {
     public func refresh() -> [TaskEvent] {
         let firstRun = tasks.isEmpty
         try? store.stampMissingIDs()
-        let result = store.scan()
+        var result = store.scan()
+        if result.tasks.contains(where: \.hasLegacyTimeFields) {
+            migrateTimeFields()
+            result = store.scan()
+        }
         var external: [TaskEvent] = []
         if !firstRun {
             external = TaskStore.diff(old: tasks, new: result.tasks, at: clock.now(), defaultDay: store.effectiveDay)
@@ -69,6 +73,15 @@ public final class Coordinator {
         syncTags()
         writeNow()
         return external
+    }
+
+    /// Session counts and estimates became time spent: moves any line still carrying them over,
+    /// backing the files up first. Checked on every refresh, since an old line can come back
+    /// (say, a note restored from a backup).
+    func migrateTimeFields() {
+        let stamp = ISO8601.string(clock.now()).replacingOccurrences(of: ":", with: "-")
+        try? store.migrateLegacyTimeFields(spentByTask: SessionRecorder.spentMinutes(recorder.log.readAll()),
+                                           backupDir: supportDir.appendingPathComponent("Backups/time-spent-\(stamp)"))
     }
 
     // MARK: Tags

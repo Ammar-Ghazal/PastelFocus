@@ -13,9 +13,14 @@ public final class IndexDatabase {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard sqlite3_open(url.path, &db) == SQLITE_OK else { throw IndexError.open(url.path) }
         try exec("PRAGMA journal_mode=WAL;")
+        // Version 2: tasks.est and tasks.actual (session counts) became tasks.spent_min. The index is
+        // a cache, so an older tasks table is dropped and refilled by the next rebuild.
+        if userVersion() < Self.schemaVersion {
+            try exec("DROP TABLE IF EXISTS tasks; PRAGMA user_version = \(Self.schemaVersion);")
+        }
         try exec("""
         CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, title TEXT, status TEXT, category TEXT, priority INTEGER,
-            est INTEGER, actual INTEGER, created TEXT, scheduled TEXT, due TEXT, completed TEXT, file TEXT);
+            spent_min INTEGER, created TEXT, scheduled TEXT, due TEXT, completed TEXT, file TEXT);
         CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY, kind TEXT, task_id TEXT, category TEXT, planned_s INTEGER,
             started_at REAL, ended_at REAL, focused_s INTEGER, outcome TEXT, pause_count INTEGER, pause_s INTEGER);
         CREATE TABLE IF NOT EXISTS events(at REAL, task_id TEXT, type TEXT, field TEXT, old TEXT, new TEXT, actor TEXT, reason TEXT);
@@ -27,6 +32,15 @@ public final class IndexDatabase {
     }
 
     deinit { sqlite3_close(db) }
+
+    static let schemaVersion: Int32 = 2
+
+    private func userVersion() -> Int32 {
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt, nil) == SQLITE_OK, sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return sqlite3_column_int(stmt, 0)
+    }
 
     func exec(_ sql: String) throws {
         var err: UnsafeMutablePointer<CChar>?
@@ -62,9 +76,9 @@ public final class IndexDatabase {
     public func rebuild(tasks: [TaskItem], sessions: [SessionRecord], events: [TaskEvent], insights: [Insight]) throws {
         try exec("BEGIN; DELETE FROM tasks; DELETE FROM sessions; DELETE FROM events; DELETE FROM insights;")
         do {
-            try insert("INSERT OR REPLACE INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows: tasks.compactMap { t in
+            try insert("INSERT OR REPLACE INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?,?)", rows: tasks.compactMap { t in
                 guard let id = t.taskID else { return nil }
-                return [id, t.title, t.status.rawValue, t.category, t.priority.rawValue, t.estimateSessions, t.actualSessions,
+                return [id, t.title, t.status.rawValue, t.category, t.priority.rawValue, t.spentMinutes,
                         t.created, t.scheduled, t.due, t.completed, t.file]
             })
             try insert("INSERT OR REPLACE INTO sessions VALUES(?,?,?,?,?,?,?,?,?,?,?)", rows: sessions.map { s in

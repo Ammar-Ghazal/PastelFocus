@@ -38,7 +38,7 @@ final class InboxTests: XCTestCase {
         XCTAssertEqual(try InboxProcessor.parse("priority 🆔 c4x8 ⏫").command, .priority(id: "c4x8", .high))
         XCTAssertEqual(try InboxProcessor.parse("priority 🆔 c4x8 🔺").command, .priority(id: "c4x8", .urgent))
         XCTAssertEqual(try InboxProcessor.parse("priority 🆔 c4x8 urgent").command, .priority(id: "c4x8", .urgent))
-        XCTAssertEqual(try InboxProcessor.parse("estimate 🆔 c4x8 3").command, .estimate(id: "c4x8", sessions: 3))
+        XCTAssertThrowsError(try InboxProcessor.parse("estimate 🆔 c4x8 3")) // replaced by time spent
         XCTAssertEqual(try InboxProcessor.parse("suggest-focus 🆔 r7q2 40m — why: best slot").command, .suggestFocus(id: "r7q2", minutes: 40))
         XCTAssertEqual(try InboxProcessor.parse("complete 🆔 e1w5 #by-you").actor, .you)
         XCTAssertThrowsError(try InboxProcessor.parse("fly 🆔 r7q2"))

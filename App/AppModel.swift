@@ -374,7 +374,6 @@ final class AppModel: ObservableObject {
         case .reopened: undo = { try? store.setStatus(e.taskId, .done, actor: .you) }
         case .rescheduled: undo = e.old.map { old in { try? store.reschedule(e.taskId, to: old, actor: .you, reason: "undo") } }
         case .priorityChanged: undo = e.old.flatMap(Int.init).flatMap(Priority.init(rawValue:)).map { p in { try? store.setPriority(e.taskId, p, actor: .you) } }
-        case .estimateChanged: undo = e.old.flatMap(Int.init).map { n in { try? store.setEstimate(e.taskId, sessions: n, actor: .you) } }
         case .created: undo = { try? store.setStatus(e.taskId, .cancelled, actor: .you, reason: "undo") }
         default: undo = nil
         }
@@ -525,7 +524,6 @@ final class AppModel: ObservableObject {
         switch s.action {
         case .useShorterSessions(let m): startFocus(minutes: m, skipSuggestion: true)
         case .takeBreak(let kind, let m): startRest(kind: kind, minutes: m)
-        case .raiseEstimate(let id, let n): try? coordinator.perform { try $0.setEstimate(id, sessions: n, actor: .you) }; publish()
         case .splitOrDrop(let id): if let t = coordinator.store.find(id) { openInObsidian(t) }
         }
     }

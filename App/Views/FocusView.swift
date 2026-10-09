@@ -190,7 +190,6 @@ struct FocusView: View {
         switch a {
         case .useShorterSessions(let m): return "Use \(m) min"
         case .takeBreak(let k, let m): return k == .nsdr ? "Start NSDR (\(m) min)" : "Start \(m)-min break"
-        case .raiseEstimate(_, let n): return "Plan \(n)"
         case .splitOrDrop: return "Open in Obsidian"
         }
     }

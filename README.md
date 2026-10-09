@@ -60,7 +60,7 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 ### Task line (Obsidian Tasks plugin format)
 
 ```
-- [ ] Finalize resume — one ready-to-send version #career [est:: 3] [sessions:: 1] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
+- [ ] Finalize resume — one ready-to-send version #career [spent:: 1h 25m] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
     - notes as indented sub-bullets
 ```
 
@@ -68,15 +68,17 @@ Priority: 🔺 urgent, ⏫ high, 🔼 medium, 🔽 low (⏬ is read as low); no 
 
 Below today's tasks, the list shows upcoming one-time tasks: open tasks planned for a later day (by ⏳, or by the daily note they sit in), under a heading per day ("Tomorrow", "Friday", …). A task with a Tasks-plugin recurrence (`🔁 every day`, `🔁 every week on Monday`) is a routine: it shows only on its current day, so future copies of it never fill the list. Undated Backlog tasks stay off the list, and Daily Progress counts only today's tasks.
 
-Legacy Hermes lines (`- [ ] **P1 · 90 min** Title — detail`) are still read: P1/P2/P3 → priority, minutes → estimated sessions.
+**Time spent.** `[spent:: 1h 25m]` is the focus time logged on the task, kept in step with the sessions log after every focus session (finished, stopped or switched). The app owns it; it is shown on Today rows, in the editor and in Now.md. Estimates and session counts are gone: on refresh, any line still carrying `[est:: N]` or `[sessions:: N]` is rewritten with `[spent:: …]` (the time the sessions log holds for the task, or N × 25 min for an old count the log doesn't know), and each changed file is first copied to `~/Library/Application Support/PastelFocus/Backups/`. An `[est:: N]` in a create command is dropped.
+
+Legacy Hermes lines (`- [ ] **P1 · 90 min** Title — detail`) are still read: P1/P2/P3 → priority (the minutes are left as text).
 
 ### Inbox commands
 
-`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `estimate 🆔 id N` · `complete|reopen|cancel|later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …`, with an Undo toast in the app.
+`create <task line>` · `reschedule 🆔 id ⏳ YYYY-MM-DD` · `priority 🆔 id urgent|high|medium|low|none` · `complete|reopen|cancel|later 🆔 id` · `suggest-focus 🆔 id 40m` · `start-focus 🆔 id 25m` (off unless allowed in Settings) · `link-session <session id> 🆔 id`. Append ` — reason: …`. Results: `→ applied HH:MM by hermes` or `→ error: …` (the old `estimate` command now answers with an error), with an Undo toast in the app.
 
 ## Analytics and suggestions
 
-Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates by category / time of day / block of the day (fatigue), weekdays, pause position, estimate ratios, repeated postponements, best time per category, NSDR effect. A pattern needs ≥12 sessions on ≥7 days, a ≥1.5× rate gap (or ≥20% duration gap) and non-overlapping 80% Wilson intervals.
+Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates by category / time of day / block of the day (fatigue), weekdays, pause position, repeated postponements, best time per category, NSDR effect. A pattern needs ≥12 sessions on ≥7 days, a ≥1.5× rate gap (or ≥20% duration gap) and non-overlapping 80% Wilson intervals.
 
 `SuggestionEngine` turns insights into rare cards, only at a session start, a session end or planning — never mid-session: ≤3 per day, ≥90 min apart, each kind ≤ once per 3 days, paused 14 days after two dismissals, mutable. Every card has **Why?** with the real numbers.
 
@@ -121,7 +123,7 @@ Plain statistics in `AnalyticsEngine` (no model): focus span, interruption rates
 
 Each finished focus session plants a pixel sprite (design from its task's first tag, size by minutes, glowing if ≥40 min with no pauses, golden if the task had been postponed 3+ times). Stopped sessions leave a wilted sprout that becomes soil after a day; NSDR leaves a sleeping cat. Good days unlock a path, pond, stone lantern, red bridge, small house and waterfall; the streak counts good days in a row, allowing one missed day per week. A good day is total focused time across all focus sessions (finished or stopped) reaching a threshold you set in Settings, 3 h by default; breaks and NSDR neither count nor spoil it. Stats files show the same count.
 
-**Editing tasks.** Click a Today row's pencil (or double-click the row) to open the task in its own window: title, details, tags (the first decides the plant), priority, status, estimate, scheduled/due/start dates, repeat rule and notes (the bullets under the line). Saving writes only the fields you changed, onto the line as it is at that moment, so a change Hermes made while the window was open (say, a new session count) is kept. Rewriting a legacy `**P1 · 90 min**` line turns its priority into an emoji. Each change is logged in the events log. Right-click a row for quick actions: start focus, priority, Move to Later, Open in Obsidian and Delete.
+**Editing tasks.** Click a Today row's pencil (or double-click the row) to open the task in its own window: title, details, tags (the first decides the plant), priority, status, time spent (read-only), scheduled/due/start dates, repeat rule and notes (the bullets under the line). Saving writes only the fields you changed, onto the line as it is at that moment, so a change Hermes made while the window was open (say, new time spent) is kept. Rewriting a legacy `**P1 · 90 min**` line turns its priority into an emoji. Each change is logged in the events log. Right-click a row for quick actions: start focus, priority, Move to Later, Open in Obsidian and Delete.
 
 **Tags and plants.** The first tag on a task line (skipping `#later`, which marks priority) is the task's category and decides its plant, both in the garden and as the icon on its Today row. Each tag picks one of ten slots (A–J) in `PastelFocus/Tags.md`; every theme draws its own design for each slot (`App/Theme/PlantArt.swift`, currently one shared set), and a tag can optionally pick a different slot in one theme. New tags, from you or Hermes, are added on the least-used slot; several tags may share a slot. Renaming a tag in Settings → Tags rewrites it on every task line; only unused tags can be removed. The Today panel's filter pills are All, one pill per tag on listed tasks (today's and upcoming), then Done; drag a tag pill onto another (or drag rows in Settings → Tags) to reorder. The order is the row order of `Tags.md`. `#later` has no pill: later tasks sink below the other unfinished tasks and keep their "Later" chip.
 
@@ -151,7 +153,7 @@ Requires Xcode 27, `xcodegen` (Homebrew) and the Apple Developer team `58FZ49BXR
 | `TaskStoreTests` | Scan, Today filter, upcoming one-time tasks, ID stamping, edits + events, editor saves (changed fields only, notes, repeat rule, legacy lines), create, delete + undo, outside-edit diff, Problems.md, concurrent-write conflict |
 | `FocusEngineTests` | Completion, pause/resume, stop, paused-out, sleep, cycle, restart restore, recorder output |
 | `InboxTests` | Command parsing, apply + tick results, focus commands, header |
-| `AnalyticsTests` | Wilson interval, thresholds, focus span, category, fatigue, estimates, postponed, reports |
+| `AnalyticsTests` | Wilson interval, thresholds, focus span, category, fatigue, postponed, reports |
 | `SuggestionTests` | Each rule, never mid-session, budget, dismissals, mute |
 | `GardenTests` | Growth rules, stable non-overlapping layout per period, plot grows with items, plants keep their relative spot as it grows, period keys/shifts, landmarks/run, fireflies |
 | `StopReasonsTests` | Shortening, saving, de-duplication, short label in the note |

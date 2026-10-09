@@ -149,7 +149,7 @@ final class FocusEngineTests: XCTestCase {
         XCTAssertEqual(e2.phase, .running)
     }
 
-    func testRecorderWritesLogNoteAndSessionCount() throws {
+    func testRecorderWritesLogNoteAndTimeSpent() throws {
         let config = makeVault()
         let clock = FixedClock("2026-10-07T05:02:00Z")
         let store = TaskStore(config: config, calendar: dubai, clock: clock)
@@ -161,7 +161,13 @@ final class FocusEngineTests: XCTestCase {
         try recorder.record(XCTUnwrap(e.tick()))
 
         XCTAssertEqual(recorder.log.readAll().count, 1)
-        XCTAssertEqual(store.find("r7q2")?.actualSessions, 1)
+        XCTAssertEqual(store.find("r7q2")?.spentMinutes, 25)
+        // Stopped or switched sessions count as time spent too.
+        try e.start(task: task)
+        clock.advance(600)
+        try recorder.record(e.stop(reason: "blocked"))
+        XCTAssertEqual(store.find("r7q2")?.spentMinutes, 35)
+        XCTAssertTrue(read(config.dailyNote("2026-10-07")).contains("Finalize resume #career [spent:: 35m] 🆔 r7q2"))
         let note = read(config.dailyNote("2026-10-07"))
         XCTAssertTrue(note.contains("## Focus log\n\n- 09:02–09:27 · 🆔 r7q2 · Finalize resume · 25/25 min · completed · pauses 0"), note)
         XCTAssertTrue(FileManager.default.fileExists(atPath: config.logsDir.appendingPathComponent("sessions-2026-10.jsonl").path))

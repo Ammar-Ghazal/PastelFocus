@@ -31,7 +31,8 @@ final class TaskEditorWindows {
     }
 }
 
-/// The whole task, editable: title, details, tags, priority, status, estimate, dates and notes.
+/// The whole task, editable: title, details, tags, priority, status, dates, repeat and notes, plus
+/// the time spent on it (read-only: it comes from the focus sessions).
 /// Saving writes only what was changed here, so edits Hermes makes meanwhile are kept.
 struct TaskEditorView: View {
     @EnvironmentObject var model: AppModel
@@ -45,7 +46,6 @@ struct TaskEditorView: View {
     @State private var tags: [String]
     @State private var status: TaskStatus
     @State private var priority: Priority
-    @State private var estimate: Int
     @State private var scheduled: String?
     @State private var due: String?
     @State private var start: String?
@@ -62,7 +62,6 @@ struct TaskEditorView: View {
         _tags = State(initialValue: original.tags)
         _status = State(initialValue: original.status)
         _priority = State(initialValue: original.priority)
-        _estimate = State(initialValue: original.estimateSessions ?? 0)
         _scheduled = State(initialValue: original.scheduled)
         _due = State(initialValue: original.due)
         _start = State(initialValue: original.start)
@@ -97,10 +96,8 @@ struct TaskEditorView: View {
                         Text("Done").tag(TaskStatus.done)
                         Text("Cancelled").tag(TaskStatus.cancelled)
                     }
-                    Stepper(value: $estimate, in: 0...40) {
-                        LabeledContent("Estimate", value: estimate == 0 ? "None" : "\(estimate) session\(estimate == 1 ? "" : "s")")
-                    }
-                    LabeledContent("Sessions done", value: "\(original.actualSessions ?? 0)")
+                    LabeledContent("Time spent", value: (original.spentMinutes ?? 0) > 0 ? GoodDay.label(original.spentMinutes!) : "None yet")
+                        .help("Logged from focus sessions on this task")
                 }
                 Section {
                     DayField(label: "Scheduled", day: $scheduled, placeholder: noteDay.map { "From its note (\($0))" } ?? "Not set")
@@ -215,7 +212,6 @@ struct TaskEditorView: View {
         }
         edited.status = status
         edited.priority = priority
-        edited.estimateSessions = estimate == 0 ? nil : estimate
         edited.scheduled = scheduled
         edited.due = due
         edited.start = start
