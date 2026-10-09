@@ -59,14 +59,18 @@ Specs: [Feasibility and Architecture](https://claude.ai/code/artifact/ad2232a3-d
 
 ### Task line (Obsidian Tasks plugin format)
 
+The full shared format, for the app and for agents writing to the vault, is [docs/TASK_FORMAT.md](docs/TASK_FORMAT.md). In short:
+
 ```
-- [ ] Finalize resume — one ready-to-send version #career [spent:: 1h 25m] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
+- [ ] 09:00 - 10:30 Finalize resume — one ready-to-send version #career [spent:: 1h 25m] ⏫ ➕ 2026-10-05 ⏳ 2026-10-07 📅 2026-10-10 🆔 r7q2
     - notes as indented sub-bullets
 ```
 
 Priority: 🔺 urgent, ⏫ high, 🔼 medium, 🔽 low (⏬ is read as low); no emoji means no priority. The Today list is sorted by priority by default (urgent, high, medium, none, low, as in the Tasks plugin); Settings → General → Today list can sort by task name or tag instead. Unfinished tasks always come first, then `#later` tasks, then finished ones.
 
 Below today's tasks, the list shows upcoming one-time tasks: open tasks planned for a later day (by ⏳, or by the daily note they sit in), under a heading per day ("Tomorrow", "Friday", …). A task with a Tasks-plugin recurrence (`🔁 every day`, `🔁 every week on Monday`) is a routine: it shows only on its current day, so future copies of it never fill the list. Undated Backlog tasks stay off the list, and Daily Progress counts only today's tasks.
+
+**Times.** A line may start with a time of day, `07:00`, or a range, `07:00 - 07:45` (24-hour), as Hermes already writes timed tasks and the Day Planner plugin reads them. It's shown on the Today row and in Now.md. A length without a time is `[duration:: 45m]`. Repeat rules (`🔁 every weekday`, `every 2 weeks on Friday`, …) are read into dates the app can work with.
 
 **Time spent.** `[spent:: 1h 25m]` is the focus time logged on the task, kept in step with the sessions log after every focus session (finished, stopped or switched). The app owns it; it is shown on Today rows, in the editor and in Now.md. Estimates and session counts are gone: on refresh, any line still carrying `[est:: N]` or `[sessions:: N]` is rewritten with `[spent:: …]` (the time the sessions log holds for the task, or N × 25 min for an old count the log doesn't know), and each changed file is first copied to `~/Library/Application Support/PastelFocus/Backups/`. An `[est:: N]` in a create command is dropped.
 
