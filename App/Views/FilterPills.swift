@@ -1,20 +1,20 @@
 import PastelFocusCore
 import SwiftUI
 
-/// Today's filter pills: All (always first), one pill per tag on today's tasks, then Done.
-/// Drag a tag pill onto another to reorder; the order is saved as the row order of Tags.md.
+/// Today's filter pills: All (always first), one pill per tag on listed tasks, then Done.
+/// Drag a tag pill to reorder; the order is saved as the row order of Tags.md.
+///
+/// While dragging, the pill's slot in the layout stays as an empty placeholder and a floating copy
+/// follows the pointer. The copy's position depends only on the pointer, never on where the slot
+/// was laid out, so it can't jump when the other pills move aside.
 struct FilterPills: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.theme) var theme
-    /// The tag being dragged, its live order while dragging, and where it was grabbed (pointer
-    /// minus the pill's centre), so the pill follows the pointer without jumping.
-    @State private var dragging: String?
-    @State private var order: [String] = []
-    @State private var grab: CGSize = .zero
-    @State private var pointer: CGPoint = .zero
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @State private var drag: PillDrag?
     @State private var frames: [String: CGRect] = [:]
 
-    private var shown: [String] { dragging == nil ? model.pillTags : order }
+    private var shown: [String] { drag?.order ?? model.pillTags }
 
     var body: some View {
         // Wraps onto more rows when the tags don't fit, so every pill stays visible.
@@ -25,48 +25,65 @@ struct FilterPills: View {
         }
         .coordinateSpace(name: "pills")
         .onPreferenceChange(PillFrames.self) { frames = $0 }
+        .overlay(alignment: .topLeading) {
+            if let d = drag {
+                label(d.tag.capitalized, .tag(d.tag))
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                    .scaleEffect(d.dropping ? 1 : 1.04)
+                    .position(d.centre)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     private func tagPill(_ tag: String) -> some View {
-        let isDragged = dragging == tag
-        let home = frames[tag].map { CGPoint(x: $0.midX, y: $0.midY) }
-        return label(tag.capitalized, .tag(tag))
+        label(tag.capitalized, .tag(tag))
+            .opacity(drag?.tag == tag ? 0 : 1) // the slot it will drop into
             .background(GeometryReader { g in Color.clear.preference(key: PillFrames.self, value: [tag: g.frame(in: .named("pills"))]) })
-            .shadow(color: .black.opacity(isDragged ? 0.25 : 0), radius: 6, y: 2)
-            .offset(isDragged && home != nil ? CGSize(width: pointer.x - grab.width - home!.x, height: pointer.y - grab.height - home!.y) : .zero)
-            .zIndex(isDragged ? 1 : 0)
-            // The dragged pill tracks the pointer exactly; only the others animate aside.
-            .transaction { if isDragged { $0.animation = nil } }
             .contentShape(Capsule())
             .onTapGesture { model.filter = .tag(tag) }
-            .gesture(drag(tag))
+            .gesture(dragGesture(tag))
             .help("Show #\(tag) tasks · drag to reorder")
             .accessibilityAddTraits(.isButton)
+            .accessibilityActions {
+                if let i = shown.firstIndex(of: tag) {
+                    if i > 0 { Button("Move left") { move(tag, to: i - 1) } }
+                    if i < shown.count - 1 { Button("Move right") { move(tag, to: i + 1) } }
+                }
+            }
     }
 
-    private func drag(_ tag: String) -> some Gesture {
+    private func dragGesture(_ tag: String) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .named("pills"))
             .onChanged { v in
-                if dragging == nil {
-                    let f = frames[tag] ?? CGRect(origin: v.startLocation, size: .zero)
-                    order = model.pillTags
-                    grab = CGSize(width: v.startLocation.x - f.midX, height: v.startLocation.y - f.midY)
-                    dragging = tag
+                if drag == nil {
+                    guard let f = frames[tag] else { return }
+                    drag = PillDrag(tag: tag, order: model.pillTags,
+                                    grab: CGSize(width: v.startLocation.x - f.midX, height: v.startLocation.y - f.midY),
+                                    pointer: v.location)
                 }
-                pointer = v.location
-                // Over another tag pill: take its place.
-                let centre = CGPoint(x: v.location.x - grab.width, y: v.location.y - grab.height)
-                guard let target = order.first(where: { $0 != tag && frames[$0]?.contains(centre) == true }),
-                      let from = order.firstIndex(of: tag), let to = order.firstIndex(of: target) else { return }
-                var next = order
-                next.remove(at: from)
-                next.insert(tag, at: to)
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { order = next }
+                drag?.pointer = v.location
+                guard let d = drag, let to = PillReorder.insertionIndex(of: tag, in: d.order, at: d.centre, frames: frames),
+                      to != d.order.firstIndex(of: tag) else { return }
+                withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86)) {
+                    drag?.order = PillReorder.moving(tag, to: to, in: d.order)
+                }
             }
             .onEnded { _ in
-                model.reorderPills(order)
-                dragging = nil
+                guard let d = drag else { return }
+                model.reorderPills(d.order)
+                // Settle the floating copy onto its slot, then show the real pill there.
+                guard !reduceMotion, let slot = frames[tag] else { drag = nil; return }
+                drag?.dropping = true
+                withAnimation(.easeOut(duration: 0.16)) {
+                    drag?.pointer = CGPoint(x: slot.midX + d.grab.width, y: slot.midY + d.grab.height)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { if drag?.tag == tag { drag = nil } }
             }
+    }
+
+    private func move(_ tag: String, to index: Int) {
+        model.reorderPills(PillReorder.moving(tag, to: index, in: shown))
     }
 
     private func label(_ text: String, _ f: TaskFilter) -> some View {
@@ -81,6 +98,17 @@ struct FilterPills: View {
         .background(Capsule().fill(active ? AnyShapeStyle(theme.accent) : AnyShapeStyle(theme.elevated)))
         .fixedSize()
     }
+}
+
+/// A pill being dragged: its live order, where it was grabbed (pointer minus the pill's centre)
+/// and the pointer, all in the pills' coordinate space.
+private struct PillDrag {
+    let tag: String
+    var order: [String]
+    let grab: CGSize
+    var pointer: CGPoint
+    var dropping = false
+    var centre: CGPoint { CGPoint(x: pointer.x - grab.width, y: pointer.y - grab.height) }
 }
 
 private struct PillFrames: PreferenceKey {
